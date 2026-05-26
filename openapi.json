@@ -1,0 +1,3317 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API Sandbox CESFAM",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Login",
+        "description": "Login sandbox: acepta cualquier credencial, devuelve un token stub.",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_v1_auth_me_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients": {
+      "get": {
+        "tags": [
+          "Pacientes"
+        ],
+        "summary": "List Patients",
+        "operationId": "list_patients_api_v1_patients_get",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/recent": {
+      "get": {
+        "tags": [
+          "Pacientes"
+        ],
+        "summary": "Recent Patients",
+        "description": "Pacientes recientes (heurística por id — los más nuevos primero).",
+        "operationId": "recent_patients_api_v1_patients_recent_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 5,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PatientSummary"
+                  },
+                  "title": "Response Recent Patients Api V1 Patients Recent Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patient_id}": {
+      "get": {
+        "tags": [
+          "Pacientes"
+        ],
+        "summary": "Get Patient",
+        "operationId": "get_patient_api_v1_patients__patient_id__get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Pacientes"
+        ],
+        "summary": "Update Patient",
+        "operationId": "update_patient_api_v1_patients__patient_id__put",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patient_id}/history": {
+      "get": {
+        "tags": [
+          "Pacientes"
+        ],
+        "summary": "Patient History",
+        "operationId": "patient_history_api_v1_patients__patient_id__history_get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patient_id}/guardians": {
+      "get": {
+        "tags": [
+          "Pacientes"
+        ],
+        "summary": "List Guardians",
+        "operationId": "list_guardians_api_v1_patients__patient_id__guardians_get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Guardian"
+                  },
+                  "title": "Response List Guardians Api V1 Patients  Patient Id  Guardians Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Pacientes"
+        ],
+        "summary": "Add Guardian",
+        "operationId": "add_guardian_api_v1_patients__patient_id__guardians_post",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardianCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Guardian"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patient_id}/guardians/{guardian_id}": {
+      "delete": {
+        "tags": [
+          "Pacientes"
+        ],
+        "summary": "Remove Guardian",
+        "operationId": "remove_guardian_api_v1_patients__patient_id__guardians__guardian_id__delete",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "guardian_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Guardian Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications": {
+      "get": {
+        "tags": [
+          "Medicamentos"
+        ],
+        "summary": "List Medications",
+        "operationId": "list_medications_api_v1_medications_get",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/stock-summary": {
+      "get": {
+        "tags": [
+          "Medicamentos"
+        ],
+        "summary": "Stock Summary",
+        "operationId": "stock_summary_api_v1_medications_stock_summary_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/low-stock": {
+      "get": {
+        "tags": [
+          "Medicamentos"
+        ],
+        "summary": "Low Stock",
+        "operationId": "low_stock_api_v1_medications_low_stock_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Medication"
+                  },
+                  "title": "Response Low Stock Api V1 Medications Low Stock Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/{medication_id}": {
+      "get": {
+        "tags": [
+          "Medicamentos"
+        ],
+        "summary": "Get Medication",
+        "operationId": "get_medication_api_v1_medications__medication_id__get",
+        "parameters": [
+          {
+            "name": "medication_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Medication Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicationDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/{medication_id}/batches": {
+      "get": {
+        "tags": [
+          "Medicamentos"
+        ],
+        "summary": "List Batches",
+        "operationId": "list_batches_api_v1_medications__medication_id__batches_get",
+        "parameters": [
+          {
+            "name": "medication_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Medication Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Batch"
+                  },
+                  "title": "Response List Batches Api V1 Medications  Medication Id  Batches Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Medicamentos"
+        ],
+        "summary": "Add Batch",
+        "operationId": "add_batch_api_v1_medications__medication_id__batches_post",
+        "parameters": [
+          {
+            "name": "medication_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Medication Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/batches/{batch_id}/write-off": {
+      "post": {
+        "tags": [
+          "Partidas"
+        ],
+        "summary": "Write Off",
+        "description": "Da de baja unidades de una partida. Descuenta availableQuantity siempre;\ndescuenta physicalQuantity solo cuando discard=true (requerimiento de auditoría).\nPersiste un registro WriteOff con motivo, cantidad, partida, medicamento y staff.",
+        "operationId": "write_off_api_v1_batches__batch_id__write_off_post",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchWriteOff"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/write-offs": {
+      "get": {
+        "tags": [
+          "Bajas"
+        ],
+        "summary": "List Write Offs",
+        "description": "Lista bajas registradas. Soporta filtros por medicamento, partida, estado y rango de fechas.",
+        "operationId": "list_write_offs_api_v1_write_offs_get",
+        "parameters": [
+          {
+            "name": "medicationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Medicationid"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Batchid"
+            }
+          },
+          {
+            "name": "status_filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Filter"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Datefrom"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dateto"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/write-offs/{write_off_id}": {
+      "get": {
+        "tags": [
+          "Bajas"
+        ],
+        "summary": "Get Write Off",
+        "operationId": "get_write_off_api_v1_write_offs__write_off_id__get",
+        "parameters": [
+          {
+            "name": "write_off_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Write Off Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteOff"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions": {
+      "get": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "List Prescriptions",
+        "description": "Lista recetas. status_filter acepta valores separados por coma: ?status_filter=SUBMITTED,RESERVED",
+        "operationId": "list_prescriptions_api_v1_prescriptions_get",
+        "parameters": [
+          {
+            "name": "status_filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Filter"
+            }
+          },
+          {
+            "name": "patientId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patientid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "Create Prescription",
+        "operationId": "create_prescription_api_v1_prescriptions_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrescriptionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions/queue": {
+      "get": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "Queue",
+        "description": "Recetas pendientes de preparación (SUBMITTED + RESERVED).",
+        "operationId": "queue_api_v1_prescriptions_queue_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Prescription"
+                  },
+                  "title": "Response Queue Api V1 Prescriptions Queue Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions/{prescription_id}": {
+      "get": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "Get Prescription",
+        "operationId": "get_prescription_api_v1_prescriptions__prescription_id__get",
+        "parameters": [
+          {
+            "name": "prescription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prescription Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions/{prescription_id}/prepare": {
+      "post": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "Prepare",
+        "description": "Mueve SUBMITTED → READY_FOR_PICKUP si hay stock disponible.",
+        "operationId": "prepare_api_v1_prescriptions__prescription_id__prepare_post",
+        "parameters": [
+          {
+            "name": "prescription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prescription Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Prescription"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions/{prescription_id}/reserve": {
+      "post": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "Reserve",
+        "operationId": "reserve_api_v1_prescriptions__prescription_id__reserve_post",
+        "parameters": [
+          {
+            "name": "prescription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prescription Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Prescription"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions/{prescription_id}/mark-available": {
+      "post": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "Mark Available",
+        "description": "RESERVED → READY_FOR_PICKUP (se dispara cuando llega stock).",
+        "operationId": "mark_available_api_v1_prescriptions__prescription_id__mark_available_post",
+        "parameters": [
+          {
+            "name": "prescription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prescription Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Prescription"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions/{prescription_id}/external-purchase": {
+      "post": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "External Purchase",
+        "operationId": "external_purchase_api_v1_prescriptions__prescription_id__external_purchase_post",
+        "parameters": [
+          {
+            "name": "prescription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prescription Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalPurchaseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Prescription"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions/{prescription_id}/cancel": {
+      "post": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "Cancel",
+        "operationId": "cancel_api_v1_prescriptions__prescription_id__cancel_post",
+        "parameters": [
+          {
+            "name": "prescription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prescription Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Prescription"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prescriptions/{prescription_id}/deliver": {
+      "post": {
+        "tags": [
+          "Recetas"
+        ],
+        "summary": "Deliver",
+        "description": "Registra la entrega: quién retira + qué partidas se usan.",
+        "operationId": "deliver_api_v1_prescriptions__prescription_id__deliver_post",
+        "parameters": [
+          {
+            "name": "prescription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prescription Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Prescription"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports": {
+      "post": {
+        "tags": [
+          "Informes"
+        ],
+        "summary": "Generate Report",
+        "description": "Genera un informe en formato CSV. La respuesta es text/csv.",
+        "operationId": "generate_report_api_v1_reports_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Batch": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "medicationId": {
+            "type": "string",
+            "title": "Medicationid"
+          },
+          "batchNumber": {
+            "type": "string",
+            "title": "Batchnumber"
+          },
+          "arrivalDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Arrivaldate"
+          },
+          "expirationDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Expirationdate"
+          },
+          "initialQuantity": {
+            "type": "integer",
+            "title": "Initialquantity"
+          },
+          "availableQuantity": {
+            "type": "integer",
+            "title": "Availablequantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "medicationId",
+          "batchNumber",
+          "arrivalDate",
+          "expirationDate",
+          "initialQuantity",
+          "availableQuantity"
+        ],
+        "title": "Batch"
+      },
+      "BatchAllocation": {
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "title": "Batchid"
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batchId",
+          "quantity"
+        ],
+        "title": "BatchAllocation"
+      },
+      "BatchCreate": {
+        "properties": {
+          "batchNumber": {
+            "type": "string",
+            "title": "Batchnumber"
+          },
+          "expirationDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Expirationdate"
+          },
+          "initialQuantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Initialquantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batchNumber",
+          "expirationDate",
+          "initialQuantity"
+        ],
+        "title": "BatchCreate"
+      },
+      "BatchWriteOff": {
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/WriteOffReason"
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity"
+          },
+          "discard": {
+            "type": "boolean",
+            "title": "Discard",
+            "default": false
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "quantity"
+        ],
+        "title": "BatchWriteOff"
+      },
+      "CancelRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "CancelRequest"
+      },
+      "DeliverRequest": {
+        "properties": {
+          "pickerType": {
+            "type": "string",
+            "enum": [
+              "patient",
+              "guardian",
+              "third_party"
+            ],
+            "title": "Pickertype"
+          },
+          "guardianId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardianid"
+          },
+          "thirdPartyRut": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thirdpartyrut"
+          },
+          "thirdPartyName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thirdpartyname"
+          },
+          "batches": {
+            "items": {
+              "$ref": "#/components/schemas/BatchAllocation"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Batches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pickerType",
+          "batches"
+        ],
+        "title": "DeliverRequest"
+      },
+      "ExternalPurchaseRequest": {
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "ExternalPurchaseRequest"
+      },
+      "Guardian": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "patientId": {
+            "type": "string",
+            "title": "Patientid"
+          },
+          "rut": {
+            "type": "string",
+            "title": "Rut"
+          },
+          "firstName": {
+            "type": "string",
+            "title": "Firstname"
+          },
+          "lastName": {
+            "type": "string",
+            "title": "Lastname"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "relationship": {
+            "type": "string",
+            "title": "Relationship"
+          },
+          "authorizationDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorizationdate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "patientId",
+          "rut",
+          "firstName",
+          "lastName",
+          "relationship"
+        ],
+        "title": "Guardian"
+      },
+      "GuardianCreate": {
+        "properties": {
+          "rut": {
+            "type": "string",
+            "title": "Rut"
+          },
+          "firstName": {
+            "type": "string",
+            "title": "Firstname"
+          },
+          "lastName": {
+            "type": "string",
+            "title": "Lastname"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "relationship": {
+            "type": "string",
+            "title": "Relationship"
+          },
+          "authorizationDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorizationdate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rut",
+          "firstName",
+          "lastName",
+          "relationship"
+        ],
+        "title": "GuardianCreate"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LoginResponse": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "user"
+        ],
+        "title": "LoginResponse"
+      },
+      "Medication": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "manufacturer": {
+            "type": "string",
+            "title": "Manufacturer"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "components": {
+            "type": "string",
+            "title": "Components"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "packaging": {
+            "type": "string",
+            "title": "Packaging"
+          },
+          "minStock": {
+            "type": "integer",
+            "title": "Minstock"
+          },
+          "stock": {
+            "$ref": "#/components/schemas/Stock"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "description",
+          "manufacturer",
+          "type",
+          "components",
+          "content",
+          "packaging",
+          "minStock",
+          "stock"
+        ],
+        "title": "Medication"
+      },
+      "MedicationDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "manufacturer": {
+            "type": "string",
+            "title": "Manufacturer"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "components": {
+            "type": "string",
+            "title": "Components"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "packaging": {
+            "type": "string",
+            "title": "Packaging"
+          },
+          "minStock": {
+            "type": "integer",
+            "title": "Minstock"
+          },
+          "stock": {
+            "$ref": "#/components/schemas/Stock"
+          },
+          "batches": {
+            "items": {
+              "$ref": "#/components/schemas/Batch"
+            },
+            "type": "array",
+            "title": "Batches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "description",
+          "manufacturer",
+          "type",
+          "components",
+          "content",
+          "packaging",
+          "minStock",
+          "stock",
+          "batches"
+        ],
+        "title": "MedicationDetail"
+      },
+      "MessageResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "MessageResponse"
+      },
+      "Patient": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "rut": {
+            "type": "string",
+            "title": "Rut"
+          },
+          "firstName": {
+            "type": "string",
+            "title": "Firstname"
+          },
+          "lastName": {
+            "type": "string",
+            "title": "Lastname"
+          },
+          "birthDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "patientCard": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "guardians": {
+            "items": {
+              "$ref": "#/components/schemas/Guardian"
+            },
+            "type": "array",
+            "title": "Guardians",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rut",
+          "firstName",
+          "lastName"
+        ],
+        "title": "Patient"
+      },
+      "PatientCard": {
+        "properties": {
+          "number": {
+            "type": "string",
+            "title": "Number"
+          },
+          "issueDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Issuedate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "issueDate"
+        ],
+        "title": "PatientCard"
+      },
+      "PatientHistory": {
+        "properties": {
+          "patient": {
+            "$ref": "#/components/schemas/Patient"
+          },
+          "activePrescriptions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Activeprescriptions"
+          },
+          "fullHistory": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Fullhistory"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient",
+          "activePrescriptions",
+          "fullHistory"
+        ],
+        "title": "PatientHistory"
+      },
+      "PatientSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "rut": {
+            "type": "string",
+            "title": "Rut"
+          },
+          "firstName": {
+            "type": "string",
+            "title": "Firstname"
+          },
+          "lastName": {
+            "type": "string",
+            "title": "Lastname"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rut",
+          "firstName",
+          "lastName"
+        ],
+        "title": "PatientSummary"
+      },
+      "PatientUpdate": {
+        "properties": {
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstname"
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastname"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "title": "PatientUpdate"
+      },
+      "Prescription": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "doctorId": {
+            "type": "string",
+            "title": "Doctorid"
+          },
+          "patientId": {
+            "type": "string",
+            "title": "Patientid"
+          },
+          "emissionDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Emissiondate"
+          },
+          "pickupDeadline": {
+            "type": "string",
+            "format": "date",
+            "title": "Pickupdeadline"
+          },
+          "treatmentType": {
+            "$ref": "#/components/schemas/TreatmentType"
+          },
+          "durationDays": {
+            "type": "integer",
+            "title": "Durationdays"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PrescriptionStatus"
+          },
+          "nextScheduledDelivery": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextscheduleddelivery"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "doctorId",
+          "patientId",
+          "emissionDate",
+          "pickupDeadline",
+          "treatmentType",
+          "durationDays",
+          "status"
+        ],
+        "title": "Prescription"
+      },
+      "PrescriptionCreate": {
+        "properties": {
+          "patientId": {
+            "type": "string",
+            "title": "Patientid"
+          },
+          "treatmentType": {
+            "$ref": "#/components/schemas/TreatmentType"
+          },
+          "durationDays": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Durationdays"
+          },
+          "pickupDeadline": {
+            "type": "string",
+            "format": "date",
+            "title": "Pickupdeadline"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PrescriptionLine"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patientId",
+          "treatmentType",
+          "durationDays",
+          "pickupDeadline",
+          "lines"
+        ],
+        "title": "PrescriptionCreate"
+      },
+      "PrescriptionDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "doctorId": {
+            "type": "string",
+            "title": "Doctorid"
+          },
+          "patientId": {
+            "type": "string",
+            "title": "Patientid"
+          },
+          "emissionDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Emissiondate"
+          },
+          "pickupDeadline": {
+            "type": "string",
+            "format": "date",
+            "title": "Pickupdeadline"
+          },
+          "treatmentType": {
+            "$ref": "#/components/schemas/TreatmentType"
+          },
+          "durationDays": {
+            "type": "integer",
+            "title": "Durationdays"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PrescriptionStatus"
+          },
+          "nextScheduledDelivery": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextscheduleddelivery"
+          },
+          "patientFullName": {
+            "type": "string",
+            "title": "Patientfullname"
+          },
+          "patientRut": {
+            "type": "string",
+            "title": "Patientrut"
+          },
+          "doctorFullName": {
+            "type": "string",
+            "title": "Doctorfullname"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PrescriptionLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "doctorId",
+          "patientId",
+          "emissionDate",
+          "pickupDeadline",
+          "treatmentType",
+          "durationDays",
+          "status",
+          "patientFullName",
+          "patientRut",
+          "doctorFullName",
+          "lines"
+        ],
+        "title": "PrescriptionDetail"
+      },
+      "PrescriptionLine": {
+        "properties": {
+          "medicationId": {
+            "type": "string",
+            "title": "Medicationid"
+          },
+          "dosesPerInterval": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Dosesperinterval"
+          },
+          "intervalHours": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Intervalhours"
+          },
+          "doseDescription": {
+            "type": "string",
+            "title": "Dosedescription"
+          },
+          "durationDays": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Durationdays"
+          },
+          "totalQuantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Totalquantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "medicationId",
+          "dosesPerInterval",
+          "intervalHours",
+          "doseDescription",
+          "durationDays",
+          "totalQuantity"
+        ],
+        "title": "PrescriptionLine"
+      },
+      "PrescriptionStatus": {
+        "type": "string",
+        "enum": [
+          "SUBMITTED",
+          "RESERVED",
+          "READY_FOR_PICKUP",
+          "PICKED_UP",
+          "EXTERNAL_PURCHASE",
+          "CANCELLED",
+          "EXPIRED"
+        ],
+        "title": "PrescriptionStatus"
+      },
+      "ReportRequest": {
+        "properties": {
+          "reportType": {
+            "$ref": "#/components/schemas/ReportType"
+          },
+          "dateFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datefrom"
+          },
+          "dateTo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dateto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reportType"
+        ],
+        "title": "ReportRequest"
+      },
+      "ReportType": {
+        "type": "string",
+        "enum": [
+          "STOCK",
+          "RESERVED",
+          "EXPIRED"
+        ],
+        "title": "ReportType"
+      },
+      "Stock": {
+        "properties": {
+          "availableQuantity": {
+            "type": "integer",
+            "title": "Availablequantity"
+          },
+          "reservedQuantity": {
+            "type": "integer",
+            "title": "Reservedquantity"
+          },
+          "physicalQuantity": {
+            "type": "integer",
+            "title": "Physicalquantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "availableQuantity",
+          "reservedQuantity",
+          "physicalQuantity"
+        ],
+        "title": "Stock"
+      },
+      "StockSummary": {
+        "properties": {
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "lowStock": {
+            "type": "integer",
+            "title": "Lowstock"
+          },
+          "outOfStock": {
+            "type": "integer",
+            "title": "Outofstock"
+          },
+          "totalMedications": {
+            "type": "integer",
+            "title": "Totalmedications"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "lowStock",
+          "outOfStock",
+          "totalMedications"
+        ],
+        "title": "StockSummary"
+      },
+      "TreatmentType": {
+        "type": "string",
+        "enum": [
+          "SHORT",
+          "LONG"
+        ],
+        "title": "TreatmentType"
+      },
+      "User": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "rut": {
+            "type": "string",
+            "title": "Rut"
+          },
+          "fullName": {
+            "type": "string",
+            "title": "Fullname"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "rut",
+          "fullName",
+          "role"
+        ],
+        "title": "User"
+      },
+      "UserRole": {
+        "type": "string",
+        "enum": [
+          "doctor",
+          "pharmacy_staff"
+        ],
+        "title": "UserRole"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WriteOff": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "batchId": {
+            "type": "string",
+            "title": "Batchid"
+          },
+          "medicationId": {
+            "type": "string",
+            "title": "Medicationid"
+          },
+          "staffId": {
+            "type": "string",
+            "title": "Staffid"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/WriteOffReason"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "status": {
+            "$ref": "#/components/schemas/WriteOffStatus"
+          },
+          "expiredAt": {
+            "type": "string",
+            "format": "date",
+            "title": "Expiredat"
+          },
+          "discardDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discarddate"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "batchId",
+          "medicationId",
+          "staffId",
+          "reason",
+          "quantity",
+          "status",
+          "expiredAt"
+        ],
+        "title": "WriteOff"
+      },
+      "WriteOffReason": {
+        "type": "string",
+        "enum": [
+          "EXPIRATION",
+          "DAMAGED",
+          "BROKEN_PACKAGE",
+          "OTHER"
+        ],
+        "title": "WriteOffReason"
+      },
+      "WriteOffStatus": {
+        "type": "string",
+        "enum": [
+          "DEDUCTED_FROM_AVAILABLE",
+          "DISCARDED"
+        ],
+        "title": "WriteOffStatus"
+      }
+    }
+  }
+}
