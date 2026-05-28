@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de Recetas — CESFAM</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar" data-role="pharmacy"></aside>
+
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>Gestión de Recetas</h1>
+        <p>Control de medicamentos recetados para pacientes</p>
+      </div>
+      <div class="row">
+        <button class="btn btn-outline btn-sm" onclick="showToast('Historial de anulados', 'En entrega 2 se mostrará el listado.', 'info')">Historial Anulados</button>
+        <button class="btn btn-outline btn-sm" onclick="showToast('Historial de no retirados', 'En entrega 2 se mostrará el listado.', 'info')">Historial No Retirados</button>
+        <button class="btn btn-outline btn-sm" onclick="showToast('Historial de retirados', 'En entrega 2 se mostrará el listado.', 'info')">Historial Retirados</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="row-between mb-3">
+        <div class="search-bar">
+          <input class="input" type="text" placeholder="Buscar paciente, RUT o medicamento">
+        </div>
+        <div class="chips" style="margin:0;">
+          <button class="chip active">Todas (4)</button>
+          <button class="chip">Ingresado (2)</button>
+          <button class="chip">Disponibles (1)</button>
+          <button class="chip">Reservado (1)</button>
+        </div>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th><th>Paciente</th><th>Medicamento</th><th>Cantidad</th>
+            <th>Fecha reserva</th><th>Vence</th><th>Estado</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>R001</strong></td>
+            <td>María González<br><small>12.345.678-9</small></td>
+            <td>Paracetamol 500mg</td>
+            <td>20</td>
+            <td>2025-03-26</td>
+            <td>2026-03-26</td>
+            <td><span class="badge success">Disponible</span></td>
+            <td class="actions"><button class="btn btn-success btn-sm"
+              data-prescription="R001" data-patient="María González" data-rut="12.345.678-9"
+              data-medicine="Paracetamol 500mg" data-quantity="20"
+              onclick="openConfirmPickup(this)">Confirmar Retiro</button></td>
+          </tr>
+          <tr>
+            <td><strong>R002</strong></td>
+            <td>Mario González<br><small>12.345.678-9</small></td>
+            <td>Paracetamol 600mg</td>
+            <td>10</td>
+            <td>2025-03-26</td>
+            <td>2026-03-26</td>
+            <td><span class="badge info">Ingresado</span></td>
+            <td class="actions">
+              <button class="btn btn-success btn-sm" onclick="prescriptionMarkAvailable(this)">Marcar disponible</button>
+              <button class="btn btn-warning btn-sm" onclick="prescriptionReserve(this)">Reservar</button>
+              <button class="btn btn-danger btn-sm" onclick="prescriptionCancel(this)">Anular</button>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>R021</strong></td>
+            <td>Martina González<br><small>12.345.678-9</small></td>
+            <td>Ibuprofeno 500mg</td>
+            <td>20</td>
+            <td>2025-03-26</td>
+            <td>2026-03-26</td>
+            <td><span class="badge info">Ingresado</span></td>
+            <td class="actions">
+              <button class="btn btn-success btn-sm" onclick="prescriptionMarkAvailable(this)">Marcar disponible</button>
+              <button class="btn btn-warning btn-sm" onclick="prescriptionReserve(this)">Reservar</button>
+              <button class="btn btn-danger btn-sm" onclick="prescriptionCancel(this)">Anular</button>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>R067</strong></td>
+            <td>Marianita González<br><small>12.345.678-9</small></td>
+            <td>Enalapril 500mg</td>
+            <td>45</td>
+            <td>2025-03-26</td>
+            <td>2026-03-26</td>
+            <td><span class="badge warning">Reservado</span></td>
+            <td class="actions">
+              <button class="btn btn-success btn-sm" onclick="prescriptionMarkAvailable(this)">Marcar disponible</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- Shared modal injected by script.js -->
+<div id="shared-modals" data-modals="confirm-pickup"></div>
+
+<script src="assets/script.js"></script>
+</body>
+</html>

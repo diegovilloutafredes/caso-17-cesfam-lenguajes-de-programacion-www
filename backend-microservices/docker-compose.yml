@@ -1,0 +1,123 @@
+services:
+  identity_service:
+    build: .
+    container_name: cesfam_identity
+    ports:
+      - "8001:8001"
+    command: uvicorn identity_service.main:app --host 0.0.0.0 --port 8001
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  patient_service:
+    build: .
+    container_name: cesfam_patients
+    ports:
+      - "8002:8002"
+    command: uvicorn patient_service.main:app --host 0.0.0.0 --port 8002
+    environment:
+      PRESCRIPTION_SERVICE_URL: http://prescription_service:8004
+    # nota: NO usamos depends_on prescription_service para evitar ciclo de startup
+    # (prescription_service ya depende de patient_service). La llamada cross-service
+    # se hace en runtime con retry + CB que tolera arrancos parciales.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  inventory_service:
+    build: .
+    container_name: cesfam_inventory
+    ports:
+      - "8003:8003"
+    command: uvicorn inventory_service.main:app --host 0.0.0.0 --port 8003
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  notification_service:
+    build: .
+    container_name: cesfam_notifications
+    ports:
+      - "8005:8005"
+    command: uvicorn notification_service.main:app --host 0.0.0.0 --port 8005
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  prescription_service:
+    build: .
+    container_name: cesfam_prescriptions
+    ports:
+      - "8004:8004"
+    command: uvicorn prescription_service.main:app --host 0.0.0.0 --port 8004
+    environment:
+      PATIENT_SERVICE_URL: http://patient_service:8002
+      INVENTORY_SERVICE_URL: http://inventory_service:8003
+      NOTIFICATION_SERVICE_URL: http://notification_service:8005
+    depends_on:
+      patient_service:
+        condition: service_healthy
+      inventory_service:
+        condition: service_healthy
+      notification_service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  report_service:
+    build: .
+    container_name: cesfam_reports
+    ports:
+      - "8006:8006"
+    command: uvicorn report_service.main:app --host 0.0.0.0 --port 8006
+    environment:
+      INVENTORY_SERVICE_URL: http://inventory_service:8003
+      PRESCRIPTION_SERVICE_URL: http://prescription_service:8004
+    depends_on:
+      inventory_service:
+        condition: service_healthy
+      prescription_service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  api_gateway:
+    build: .
+    container_name: cesfam_gateway
+    ports:
+      - "8000:8000"
+    command: uvicorn api_gateway.main:app --host 0.0.0.0 --port 8000
+    environment:
+      IDENTITY_SERVICE_URL: http://identity_service:8001
+      PATIENT_SERVICE_URL: http://patient_service:8002
+      INVENTORY_SERVICE_URL: http://inventory_service:8003
+      PRESCRIPTION_SERVICE_URL: http://prescription_service:8004
+    depends_on:
+      identity_service:
+        condition: service_healthy
+      patient_service:
+        condition: service_healthy
+      inventory_service:
+        condition: service_healthy
+      prescription_service:
+        condition: service_healthy

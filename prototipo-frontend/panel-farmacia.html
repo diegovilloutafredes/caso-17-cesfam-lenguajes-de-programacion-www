@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Farmacia — CESFAM</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar" data-role="pharmacy"></aside>
+
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>Panel Farmacia</h1>
+        <p>Gestión de prescripciones y stock de medicamentos</p>
+      </div>
+      <button class="btn btn-primary" onclick="window.location.href='gestion-stock.html'">＋ Ingresar Stock</button>
+    </header>
+
+    <!-- KPIs -->
+    <section class="grid grid-3 mb-4">
+      <div class="card kpi warning">
+        <div class="kpi-icon">⏱</div>
+        <div><div class="kpi-num">1</div><div class="kpi-label">Reservas activas (preparada)</div></div>
+      </div>
+      <div class="card kpi info">
+        <div class="kpi-icon">📋</div>
+        <div><div class="kpi-num">3</div><div class="kpi-label">Prescripciones hoy (pendientes)</div></div>
+      </div>
+      <div class="card kpi success">
+        <div class="kpi-icon">＋</div>
+        <div><div class="kpi-num">→</div><div class="kpi-label">Ingresar Stock — añadir medicamentos</div></div>
+      </div>
+    </section>
+
+    <section class="grid grid-2 mb-4">
+      <!-- Prescripciones pendientes -->
+      <div class="card">
+        <h2>Prescripciones pendientes</h2>
+        <div class="list-card">
+          <div class="meta"><strong>PC001 — María González</strong><small>Paracetamol 500mg · 20 unid.</small></div>
+          <span class="badge warning">Pendiente</span>
+        </div>
+        <div class="list-card">
+          <div class="meta"><strong>PC002 — Carlos Ramírez</strong><small>Amoxicilina 500mg · 30 unid.</small></div>
+          <span class="badge warning">Pendiente</span>
+        </div>
+        <div class="list-card">
+          <div class="meta"><strong>PC003 — Ana Martínez</strong><small>Omeprazol 20mg · 28 unid.</small></div>
+          <span class="badge info">Preparado</span>
+        </div>
+        <div class="list-card">
+          <div class="meta"><strong>PC004 — Pedro Silva</strong><small>Atorvastatina 20mg · 30 unid.</small></div>
+          <span class="badge warning">Pendiente</span>
+        </div>
+      </div>
+
+      <!-- Alertas -->
+      <div class="card">
+        <h2>Alertas de Stock</h2>
+        <div class="list-card">
+          <div class="meta"><strong>Ibuprofeno 500mg</strong><small>Stock: 180 / Mínimo: 200</small></div>
+          <span class="badge warning">Stock bajo</span>
+        </div>
+        <div class="list-card">
+          <div class="meta"><strong>Aspirina 500mg</strong><small>Stock: 50 / Mínimo: 100</small></div>
+          <span class="badge warning">Stock bajo</span>
+        </div>
+        <div class="list-card">
+          <div class="meta"><strong>Amoxicilina 500mg</strong><small>Stock: 0 / Mínimo: 150</small></div>
+          <span class="badge danger">Sin stock</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabla prescripciones -->
+    <div class="card">
+      <div class="row-between mb-3">
+        <h2 class="mt-0">Cola de Prescripciones</h2>
+        <div class="search-bar"><input class="input" type="text" placeholder="Buscar paciente o medicamento..."></div>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th><th>Paciente</th><th>RUT</th><th>Medicamento</th>
+            <th>Cantidad</th><th>Estado</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>PC001</strong></td><td>María González</td><td>12.345.678-9</td>
+            <td>Paracetamol 500mg</td><td>20</td>
+            <td><span class="badge warning">Pendiente</span></td>
+            <td class="actions"><button class="btn btn-primary btn-sm"
+              data-prescription="PC001" data-patient="María González" data-rut="12.345.678-9"
+              data-medicine="Paracetamol 500mg" data-quantity="20"
+              onclick="prescriptionPrepare(this)">Preparar</button></td>
+          </tr>
+          <tr>
+            <td><strong>PC002</strong></td><td>Carlos Ramírez</td><td>23.456.789-0</td>
+            <td>Amoxicilina 500mg <span class="badge danger" style="margin-left:6px;">Sin stock</span></td><td>30</td>
+            <td><span class="badge warning">Pendiente</span></td>
+            <td class="actions"><button class="btn btn-warning btn-sm"
+              data-prescription="PC002" data-patient="Carlos Ramírez" data-rut="23.456.789-0"
+              data-medicine="Amoxicilina 500mg" data-quantity="30"
+              onclick="openOutOfStock(this)">⚠ Preparar</button></td>
+          </tr>
+          <tr>
+            <td><strong>PC003</strong></td><td>Ana Martínez</td><td>34.567.890-1</td>
+            <td>Omeprazol 20mg</td><td>28</td>
+            <td><span class="badge info">Preparado</span></td>
+            <td class="actions"><button class="btn btn-success btn-sm"
+              data-prescription="PC003" data-patient="Ana Martínez" data-rut="34.567.890-1"
+              data-medicine="Omeprazol 20mg" data-quantity="28"
+              onclick="openConfirmPickup(this)">Entregar</button></td>
+          </tr>
+          <tr>
+            <td><strong>PC004</strong></td><td>Pedro Silva</td><td>45.678.901-2</td>
+            <td>Atorvastatina 20mg</td><td>30</td>
+            <td><span class="badge warning">Pendiente</span></td>
+            <td class="actions"><button class="btn btn-primary btn-sm"
+              data-prescription="PC004" data-patient="Pedro Silva" data-rut="45.678.901-2"
+              data-medicine="Atorvastatina 20mg" data-quantity="30"
+              onclick="prescriptionPrepare(this)">Preparar</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- Shared modals injected by script.js -->
+<div id="shared-modals" data-modals="out-of-stock,confirm-pickup"></div>
+
+<script src="assets/script.js"></script>
+</body>
+</html>

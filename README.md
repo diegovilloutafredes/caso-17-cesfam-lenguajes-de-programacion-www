@@ -1,0 +1,400 @@
+# Backend Microservicios - Caso 17 CESFAM
+
+Backend del sistema de **Automatización de Libreta de Medicamentos CESFAM**, implementado como arquitectura de microservicios.
+
+---
+
+## Tabla de contenidos
+
+1. [Arquitectura y estructura de microservicios](#1-arquitectura-y-estructura-de-microservicios)
+2. [Stack tecnológico](#2-stack-tecnológico)
+3. [Servicios - URL, puerto y responsabilidad](#3-servicios--url-puerto-y-responsabilidad)
+4. [Relaciones inter-servicio](#4-relaciones-inter-servicio)
+5. [Requisitos previos](#5-requisitos-previos)
+6. [Instalación y ejecución con Docker (recomendado)](#6-instalación-y-ejecución-con-docker-recomendado)
+7. [Scripts disponibles - qué hace cada uno](#7-scripts-disponibles--qué-hace-cada-uno)
+8. [Ejecución sin Docker (alternativa)](#8-ejecución-sin-docker-alternativa)
+9. [Usuarios dummy para probar el sandbox](#9-usuarios-dummy-para-probar-el-sandbox)
+10. [Datos iniciales (seed)](#10-datos-iniciales-seed)
+11. [Cómo probar el sandbox](#11-cómo-probar-el-sandbox)
+
+---
+
+## 1. Arquitectura y estructura de microservicios
+
+**7 procesos FastAPI** corriendo en containers Docker, cada uno con su propio dominio acotado (bounded context):
+
+```
+                Clientes HTTP (React/browser · Postman · curl)
+                                  │
+                                  ▼
+                      ┌───────────────────────┐
+                      │   ApiGateway (BFF)    │ ← entrypoint
+                      │         :8000         │
+                      └───────────┬───────────┘
+                                  │ HTTP + Bearer token
+        ┌────────────┬────────────┼──────────────┬─────────────┐
+        ▼            ▼            ▼              ▼             ▼
+   ┌──────────┐ ┌─────────┐ ┌───────────┐ ┌──────────────┐ ┌────────┐
+   │ Identity │ │ Patient │ │ Inventory │ │ Prescription │ │ Report │
+   │  :8001   │ │  :8002  │ │   :8003   │ │    :8004     │ │ :8006  │
+   └──────────┘ └────┬────┘ └───────────┘ └──────┬───────┘ └────────┘
+                     │ HTTP                       │ HTTP → 3 servicios:
+                     ▼                            ▼  Patient, Inventory,
+                                                     Notification
+               ┌──────────────┐         ┌────────────────────┐
+               │ Prescription │         │ Notification :8005 │
+               │    :8004     │         └────────────────────┘
+               └──────────────┘
+```
+
+### Estructura del proyecto
+
+```
+backend-microservices/
+├── docker-compose.yml              ← orquestación de 7 containers
+├── Dockerfile                       ← imagen compartida (python:3.12-slim + deps)
+├── .dockerignore
+├── requirements.txt                 ← fastapi, uvicorn, pydantic, httpx, tenacity
+│
+├── install.sh / install.bat         ← scripts modo Docker
+├── run.sh     / run.bat
+├── stop.sh    / stop.bat
+│
+├── install-local.sh / install-local.bat   ← scripts modo SIN Docker
+├── run-local.sh     / run-local.bat
+├── stop-local.sh    / stop-local.bat
+│
+├── shared/                          ← código común a todos los servicios
+│   ├── envelope.py                  ← ApiResponse<T> + helpers ok/created/fail
+│   ├── auth.py                      ← Bearer stub + KNOWN_USERS
+│   ├── http_client.py               ← ServiceClient base + CircuitBreaker + retry
+│   └── errors.py                    ← register_envelope_handler (uniforme cross-service)
+│
+├── api_gateway/                    (:8000)
+│   ├── main.py
+│   ├── clients/{identity,patient,inventory,prescription}.py
+│   └── routers/{auth,dashboards}.py
+│
+├── identity_service/               (:8001)
+│   ├── main.py · schemas.py · seed.py
+│   └── routers/auth.py
+│
+├── patient_service/                (:8002)
+│   ├── main.py · schemas.py · seed.py
+│   ├── clients/prescription.py     ← para GET /patients/{id}/history
+│   └── routers/patients.py
+│
+├── inventory_service/              (:8003)
+│   ├── main.py · schemas.py · seed.py
+│   └── routers/{medications,batches,writeoffs}.py
+│
+├── prescription_service/           (:8004) ← orquestador central
+│   ├── main.py · schemas.py · seed.py
+│   ├── clients/{patient,inventory,notification}.py
+│   └── routers/prescriptions.py
+│
+├── notification_service/           (:8005)
+│   ├── main.py · schemas.py · seed.py
+│   ├── providers.py                ← Twilio + SendGrid adapter stubs
+│   └── routers/notifications.py
+│
+└── report_service/                 (:8006)
+    ├── main.py
+    ├── clients/{inventory,prescription}.py
+    └── routers/reports.py
+```
+
+---
+
+## 2. Stack tecnológico
+
+| Capa | Herramienta | Versión | Para qué se usa |
+|------|------------|---------|-----------------|
+| Lenguaje | **Python** | 3.12 (modo Docker) o 3.11/3.12 (modo local) | Lenguaje de implementación de los 7 servicios |
+| Framework web | **FastAPI** | 0.115.0 | Routing, validación, generación automática de OpenAPI/Swagger UI |
+| Servidor ASGI | **uvicorn[standard]** | 0.32.0 | Servidor de aplicación (con websockets + http extras) |
+| Validación / DTOs | **Pydantic** | 2.9.2 | Schemas tipados, parsing y serialización JSON |
+| Cliente HTTP | **httpx** | 0.27.2 | Llamadas inter-servicio sincrónicas (clientes que un servicio usa para hablarle a otro) |
+| Retry policy | **tenacity** | 8.5.0 | Decoradores declarativos para retry con backoff exponencial |
+| Contenedores | **Docker Desktop** | 24+ (Compose v2) | Orquestación de los 7 containers (modo recomendado) |
+
+---
+
+## 3. Servicios - URL, puerto y responsabilidad
+
+| Servicio                | URL local                 | Swagger UI                 | Responsabilidad                                              | Tag en OpenAPI                          |
+| ----------------------- | ------------------------- | -------------------------- | ------------------------------------------------------------ | --------------------------------------- |
+| **ApiGateway**          | http://localhost:**8000** | http://localhost:8000/docs | Entrypoint del frontend. Login passthrough + agregadores BFF | Autenticación (Gateway), Tableros (BFF) |
+| **IdentityService**     | http://localhost:**8001** | http://localhost:8001/docs | Autenticación de usuarios del sistema                        | Autenticación                           |
+| **PatientService**      | http://localhost:**8002** | http://localhost:8002/docs | Pacientes, apoderados, historial médico                      | Pacientes                               |
+| **InventoryService**    | http://localhost:**8003** | http://localhost:8003/docs | Medicamentos, partidas, stock, bajas                         | Medicamentos, Partidas, Bajas           |
+| **PrescriptionService** | http://localhost:**8004** | http://localhost:8004/docs | Recetas + máquina de estados                                 | Recetas                                 |
+| **NotificationService** | http://localhost:**8005** | http://localhost:8005/docs | SMS / email (Twilio + SendGrid stubs)                        | Notificaciones                          |
+| **ReportService**       | http://localhost:**8006** | http://localhost:8006/docs | Informes CSV agregados                                       | Informes                                |
+
+Cada servicio tiene además:
+- `GET /` - info básica del servicio
+- `GET /health` - health check (no en Swagger)
+- `GET /openapi.json` - spec OpenAPI cruda
+
+---
+
+## 4. Relaciones inter-servicio
+
+| Endpoint llamado | Servicio dueño | Servicios que invoca internamente (HTTP) |
+|-----------------|----------------|------------------------------------------|
+| `POST /api/v1/auth/login` (gateway) | ApiGateway | IdentityService |
+| `GET /api/v1/doctor/dashboard` (gateway) | ApiGateway | InventoryService (×2) + PatientService |
+| `GET /api/v1/pharmacy/dashboard` (gateway) | ApiGateway | PrescriptionService (×3) + InventoryService |
+| `GET /api/v1/patients/{id}/history` | PatientService | PrescriptionService |
+| `POST /api/v1/prescriptions` (crear) | PrescriptionService | PatientService (valida que el paciente exista) |
+| `POST /api/v1/prescriptions/{id}/prepare` | PrescriptionService | InventoryService (reserveStock por línea) |
+| `POST /api/v1/prescriptions/{id}/mark-available` | PrescriptionService | InventoryService (reserve) + NotificationService (best-effort SMS) |
+| `POST /api/v1/prescriptions/{id}/cancel` | PrescriptionService | InventoryService (releaseStock si estaba reservado) |
+| `POST /api/v1/prescriptions/{id}/deliver` | PrescriptionService | InventoryService (consume por allocations de batches) |
+| `POST /api/v1/reports` (STOCK/RESERVED/EXPIRED) | ReportService | InventoryService + PrescriptionService |
+| El resto (CRUDs simples) | — | Sin cross-service |
+
+**Toda llamada inter-servicio pasa por** `shared/http_client.py` → retry 3× con backoff exponencial + Circuit Breaker (abre tras 5 fallos, reset a los 30s).
+
+---
+
+## 5. Requisitos previos
+
+### Modo Docker (recomendado)
+
+| Herramienta | Versión | Verificar | Instalar |
+|-------------|---------|-----------|----------|
+| **Docker Desktop** | 24+ (Compose v2) | `docker --version && docker compose version` | https://www.docker.com/products/docker-desktop |
+| Espacio en disco | ~500 MB | — | — |
+| RAM | ~1 GB | — | — |
+| Puertos libres | 8000-8006 | `lsof -i:8000` (vacío = libre) | — |
+
+### Modo SIN Docker (alternativa)
+
+| Herramienta | Versión | Verificar |
+|-------------|---------|-----------|
+| **Python** | 3.11 o 3.12 (evitar 3.13 por warnings cosméticos de hashlib) | `python3 --version` |
+| pip | viene con Python | `pip --version` |
+
+---
+
+## 6. Instalación y ejecución con Docker (recomendado)
+
+Tres comandos cubren el ciclo completo:
+
+```bash
+cd backend-microservices
+chmod +x *.sh          # solo primera vez en macOS/Linux
+./install.sh           # build de las 7 imágenes (~2 min primera vez)
+./run.sh               # arranca los 7 containers en background, muestra URLs
+```
+
+Para Windows, los mismos pasos pero con archivos `.bat`:
+
+```cmd
+install.bat
+run.bat
+```
+
+Tras `run.sh` / `run.bat`, abrir en el navegador: **http://localhost:8000/docs**
+
+### Para detener
+
+```bash
+./stop.sh              # o stop.bat en Windows
+```
+
+### Para resetear el estado a la seed inicial
+
+```bash
+./stop.sh && ./run.sh   # docker compose down + up recrea containers desde la imagen
+```
+
+---
+
+## 7. Scripts disponibles
+
+### Modo Docker
+
+| Script                       | Qué hace                                                                                                                                                                                         | Cuándo usarlo                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `install.sh` / `install.bat` | Verifica que Docker está corriendo. Ejecuta `docker compose build` para construir las 7 imágenes a partir del Dockerfile compartido.                                                             | **Una sola vez** tras clonar el repo, o cuando cambia código. |
+| `run.sh` / `run.bat`         | Verifica Docker activo. Ejecuta `docker compose up -d` para arrancar los 7 containers en background. Espera unos segundos a que estén healthy. Imprime el estado y todas las URLs de Swagger UI. | Cada vez que quieres arrancar el sandbox.                     |
+| `stop.sh` / `stop.bat`       | Ejecuta `docker compose down`, detiene y elimina los 7 containers + la red Docker. **Las imágenes permanecen** (próxima vez `run.sh` es rápido).                                                 | Cuando terminas de trabajar.                                  |
+
+### Modo SIN Docker
+
+| Script                                   | Qué hace                                                                                                                                                                                        | Cuándo usarlo                      |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `install-local.sh` / `install-local.bat` | Verifica Python instalado. Crea `.venv/` y ejecuta `pip install -r requirements.txt`.                                                                                                           | Una vez en máquinas sin Docker.    |
+| `run-local.sh`                           | Setea env vars `*_SERVICE_URL=http://localhost:XXXX`. Arranca los 7 servicios con `uvicorn` en background. Guarda PIDs en `.pids/` y logs en `logs/<servicio>.log`. Hace health-check de los 7. | Para arrancar sin Docker.          |
+| `run-local.bat`                          | Equivalente para Windows: abre 7 ventanas de `cmd`, una por servicio. Cada ventana muestra logs en vivo de ese servicio.                                                                        | Arrancar sin Docker en Windows.    |
+| `stop-local.sh`                          | Lee `.pids/*.pid` y mata los procesos. Borra `.pids/`.                                                                                                                                          | Detener modo local en macOS/Linux. |
+| `stop-local.bat`                         | Mata los procesos que escuchan en los puertos 8000-8006.                                                                                                                                        | Detener modo local en Windows.     |
+
+---
+
+## 8. Ejecución sin Docker (alternativa)
+
+Pre-requisito: Python 3.11 o 3.12 instalado y disponible en `PATH`.
+
+### macOS / Linux
+
+```bash
+chmod +x *.sh                # solo primera vez
+./install-local.sh           # crea .venv + pip install
+./run-local.sh               # arranca los 7 servicios en background
+./stop-local.sh              # detener todo
+```
+
+### Windows
+
+```cmd
+install-local.bat            REM crea .venv + pip install
+run-local.bat                REM abre 7 ventanas cmd, una por servicio
+stop-local.bat               REM mata los procesos por puerto
+```
+
+Los logs en macOS/Linux quedan en `./logs/<servicio>.log`. En Windows aparecen en cada ventana de cmd.
+
+---
+
+## 9. Usuarios dummy para probar el sandbox
+
+El sandbox **acepta cualquier credencial** en el login, (no valida password). Pero el `username` determina qué usuario "asume" la sesión, lo cual define el rol que ven los demás endpoints.
+
+### Login y token
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"drperez","password":"cualquiercosa"}'
+```
+
+Devuelve:
+
+```json
+{
+  "statusCode": 200,
+  "data": {
+    "token": "sandbox-token-USR-001",
+    "user": {
+      "id": "USR-001",
+      "username": "drperez",
+      "rut": "11.111.111-1",
+      "fullName": "Dr. Juan Pérez",
+      "email": "juan.perez@cesfam.cl",
+      "role": "doctor"
+    }
+  }, ...
+}
+```
+
+### Tabla de usuarios dummy disponibles
+
+| username    | Token resultante        | Usuario        | Rol                | Para probar                                              |
+| ----------- | ----------------------- | -------------- | ------------------ | -------------------------------------------------------- |
+| `drperez`   | `sandbox-token-USR-001` | Dr. Juan Pérez | **doctor**         | Flujos médicos: crear recetas, ver historial paciente    |
+| `dralopez`  | `sandbox-token-USR-003` | Dra. Ana López | **doctor**         | Médico alternativo                                       |
+| `mgonzalez` | `sandbox-token-USR-002` | María González | **pharmacy_staff** | Flujos farmacia: preparar, entregar, write-offs, reports |
+
+### Cómo usar el token
+
+Una vez logueado, el token va en el header `Authorization`:
+
+```bash
+curl http://localhost:8000/api/v1/doctor/dashboard \
+  -H "Authorization: Bearer sandbox-token-USR-001"
+```
+
+En **Swagger UI**, (recomendado para explorar):
+1. Click en el botón **Authorize** (arriba a la derecha de la página).
+2. Pegar el token, (por ejemplo: `sandbox-token-USR-002`) **sin** el prefijo "Bearer".
+3. Ahora cualquier endpoint que ejecutes incluye el header automáticamente
+
+### Validar identidad propagada
+
+```bash
+# Login como pharmacy_staff
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"mgonzalez","password":"x"}'
+# → token sandbox-token-USR-002
+
+# Verificar que /me retorna pharmacy_staff (no default doctor)
+curl http://localhost:8001/api/v1/auth/me \
+  -H "Authorization: Bearer sandbox-token-USR-002"
+# → role: "pharmacy_staff"
+```
+
+---
+
+## 10. Datos iniciales (seed)
+
+Cada servicio carga su propia seed al arrancar. Estado en memoria; al reiniciar el container, vuelve al seed.
+
+| Servicio             | Qué hay precargado                                                                                                                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| identity_service     | **3 usuarios**                                                                                                                                                                                                                              |
+| patient_service      | **5 pacientes** (PAT-001 a PAT-005) + **2 apoderados** (GRD-001 hijo, GRD-002 esposo, ambos asociados a PAT-001)                                                                                                                            |
+| inventory_service    | **7 medicamentos** (MED-0001 Paracetamol, MED-0002 Ibuprofeno, MED-0003 Amoxicilina, MED-0004 Omeprazol, MED-0005 Enalapril, MED-0006 Aspirina, MED-0007 Losartán) + **7 partidas** (BCH-001 a BCH-007) con invariantes de stock respetadas |
+| prescription_service | **6 recetas** en distintos estados (R001-R004, R045, R012)                                                                                                                                                                                  |
+| notification_service | **1 notificación histórica** (NTF-001)                                                                                                                                                                                                      |
+| report_service       | Sin estado, los reportes se generan on-demand                                                                                                                                                                                               |
+
+---
+
+## 11. Cómo probar el sandbox
+
+### Flujo recomendado para entender la arquitectura
+
+```bash
+TOKEN="Bearer sandbox-token-USR-001"
+
+# 1) Login (passthrough gateway → identity)
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" -d '{"username":"drperez","password":"x"}'
+
+# 2) Dashboard del médico (1 call → 3 servicios)
+curl http://localhost:8000/api/v1/doctor/dashboard -H "Authorization: $TOKEN"
+
+# 3) Historial de un paciente (1 call → 2 servicios)
+curl http://localhost:8002/api/v1/patients/PAT-001/history -H "Authorization: $TOKEN"
+
+# 4) Crear receta (valida paciente cross-service)
+curl -X POST http://localhost:8004/api/v1/prescriptions \
+  -H "Authorization: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"patientId":"PAT-002","treatmentType":"SHORT","durationDays":7,
+       "pickupDeadline":"2026-06-15",
+       "items":[{"medicationId":"MED-0001","dosesPerInterval":1,"intervalHours":8,
+                 "doseDescription":"1 c/8h","durationDays":7,"totalQuantity":10}]}'
+
+# 5) Preparar receta (reserva stock cross-service)
+curl -X POST http://localhost:8004/api/v1/prescriptions/R046/prepare -H "Authorization: $TOKEN"
+
+# 6) Verificar stock cambió en otro servicio
+curl http://localhost:8003/api/v1/medications/MED-0001 -H "Authorization: $TOKEN"
+```
+
+### Verificación manual mínima
+
+Con el sandbox corriendo (`./run.sh`):
+
+```bash
+# Health check de los 7 servicios
+for port in 8000 8001 8002 8003 8004 8005 8006; do
+  echo -n "$port: "; curl -s http://localhost:$port/health
+  echo
+done
+# → cada uno debe retornar {"status":"ok","service":"..."}
+
+# Login + verificación de identidad
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"drperez","password":"x"}'
+# → ApiResponse con token sandbox-token-USR-001
+
+# Cross-service flow completo: ver el §10 anterior
+```

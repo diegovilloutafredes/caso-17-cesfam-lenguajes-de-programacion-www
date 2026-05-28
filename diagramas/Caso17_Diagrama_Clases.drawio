@@ -1,0 +1,393 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="case17" name="Caso 17 - Diagrama de Clases">
+    <mxGraphModel dx="1067" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="2000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontStyle=1;" value="Caso 17 — CESFAM&lt;br&gt;Diagrama de Clases" vertex="1">
+          <mxGeometry height="50" width="900" x="475" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="notaTransporte" parent="1" style="shape=note;size=14;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;fontSize=11;spacingTop=8;spacingLeft=14;spacingRight=22;spacingBottom=8;shadow=1;" value="&lt;b&gt;Nota — Transporte vs Dominio&lt;/b&gt;&lt;hr style=&quot;margin: 6px 0px; border-width: 1px 0px 0px; border-style: solid none none; border-color: rgb(214, 182, 86) currentcolor currentcolor; border-image: initial;&quot;&gt;&lt;div style=&quot;text-align:left;&quot;&gt;Este diagrama modela el &lt;b&gt;dominio interno&lt;/b&gt; de cada servicio. Los métodos públicos retornan tipos de dominio directamente (Prescription, Batch, Patient, ...).&lt;br&gt;&lt;br&gt;En el &lt;b&gt;límite del servicio&lt;/b&gt; (capa de transporte / API REST), todos los métodos públicos se envuelven en:&lt;br&gt;&lt;br&gt;&amp;nbsp;&amp;nbsp;&lt;i&gt;ApiResponse&amp;lt;T&amp;gt; { statusCode: Integer, data: T, error: ErrorDetail }&lt;/i&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="200" width="440" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="notaEnums" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;align=center;fontSize=10;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;dashed=1;" value="&lt;b&gt;Enumeraciones&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #666666;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;&lt;b&gt;UserRole:&lt;/b&gt; DOCTOR, PHARMACY_STAFF&lt;br/&gt;&lt;b&gt;PickerType:&lt;/b&gt; PATIENT, GUARDIAN, THIRD_PARTY&lt;br/&gt;&lt;b&gt;TreatmentType:&lt;/b&gt; SHORT, LONG&lt;br/&gt;&lt;b&gt;PrescriptionStatus:&lt;/b&gt; SUBMITTED, RESERVED,&lt;br/&gt;&amp;nbsp;&amp;nbsp;READY_FOR_PICKUP, PICKED_UP,&lt;br/&gt;&amp;nbsp;&amp;nbsp;EXTERNAL_PURCHASE, CANCELLED, EXPIRED&lt;br/&gt;&lt;b&gt;WriteOffStatus:&lt;/b&gt; DEDUCTED_FROM_AVAILABLE,&lt;br/&gt;&amp;nbsp;&amp;nbsp;DISCARDED&lt;br/&gt;&lt;b&gt;WriteOffReason:&lt;/b&gt; EXPIRATION, DAMAGED,&lt;br/&gt;&amp;nbsp;&amp;nbsp;BROKEN_PACKAGE, OTHER&lt;br/&gt;&lt;b&gt;NotificationType:&lt;/b&gt; SMS, EMAIL&lt;br/&gt;&lt;b&gt;DeliveryStatus:&lt;/b&gt; PENDING, SENT, ERROR&lt;br/&gt;&lt;b&gt;ReportType:&lt;/b&gt; STOCK, RESERVED, EXPIRED&lt;br/&gt;&lt;b&gt;NotificationEvent:&lt;/b&gt; STOCK_ARRIVED,&lt;br/&gt;&amp;nbsp;&amp;nbsp;RESERVATION_AVAILABLE, PICKUP_REMINDER&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #666666;&quot;/&gt;&lt;b&gt;Transiciones de PrescriptionStatus:&lt;/b&gt;&lt;br/&gt;SUBMITTED → RESERVED (sin stock)&lt;br/&gt;SUBMITTED → READY_FOR_PICKUP (con stock)&lt;br/&gt;RESERVED → READY_FOR_PICKUP (al llegar stock)&lt;br/&gt;READY_FOR_PICKUP → PICKED_UP (entrega)&lt;br/&gt;READY_FOR_PICKUP → EXPIRED (vence plazo)&lt;br/&gt;SUBMITTED → EXTERNAL_PURCHASE (sin stock + farmacia externa)&lt;br/&gt;* → CANCELLED (paciente desiste)&lt;/div&gt;" vertex="1">
+          <mxGeometry height="340" width="480" x="1400" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="rolOpsNote" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;align=center;fontSize=10;spacingTop=6;spacingLeft=10;spacingRight=10;spacingBottom=6;dashed=1;" value="&lt;b&gt;Operaciones autorizadas por rol&lt;/b&gt;&lt;br/&gt;&lt;i&gt;(implementadas en services, no son métodos de User)&lt;/i&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #666666;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;&lt;b&gt;DOCTOR:&lt;/b&gt;&lt;br/&gt;+ createPrescription(): Prescription&lt;br/&gt;+ reviewStock(m: Medication): Stock&lt;br/&gt;&lt;br/&gt;&lt;b&gt;PHARMACY_STAFF:&lt;/b&gt;&lt;br/&gt;+ addStock(b: Batch): void&lt;br/&gt;+ registerDelivery(d: MedicationDelivery): void&lt;br/&gt;+ registerWriteOff(w: WriteOff): void&lt;br/&gt;+ reservePrescription(p: Prescription): void&lt;br/&gt;+ generateReport(): Report&lt;/div&gt;" vertex="1">
+          <mxGeometry height="180" width="440" x="40" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="patient" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;Patient&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #82b366;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- rut: String&lt;br/&gt;- firstName: String&lt;br/&gt;- lastName: String&lt;br/&gt;- birthDate: Date&lt;br/&gt;- address: String&lt;br/&gt;- phone: String&lt;br/&gt;- email: String&lt;/div&gt;" vertex="1">
+          <mxGeometry height="210" width="240" x="40" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="user" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;User&lt;/b&gt;&lt;hr style=&quot;margin: 4px 0px; border-width: 1px 0px 0px; border-style: solid none none; border-color: rgb(108, 142, 191) currentcolor currentcolor; border-image: initial;&quot;&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br&gt;- username: String&lt;br&gt;- rut: String&lt;br&gt;- fullName: String&lt;br&gt;- email: String&lt;br&gt;- role: UserRole&lt;/div&gt;&lt;hr style=&quot;margin: 4px 0px; border-width: 1px 0px 0px; border-style: solid none none; border-color: rgb(108, 142, 191) currentcolor currentcolor; border-image: initial;&quot;&gt;&lt;div style=&quot;text-align:left;&quot;&gt;+ authenticate(password: String): Boolean&lt;br&gt;+ logOut(): void&lt;/div&gt;" vertex="1">
+          <mxGeometry height="220" width="240" x="320" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="prescription" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;Prescription&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #9673a6;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- emissionDate: Date&lt;br/&gt;- pickupDeadline: Date&lt;br/&gt;- treatmentType: TreatmentType&lt;br/&gt;- durationDays: Integer&lt;br/&gt;- status: PrescriptionStatus&lt;br/&gt;- nextScheduledDelivery: Date&lt;/div&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #9673a6;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;+ changeStatus(s: PrescriptionStatus): void&lt;/div&gt;" vertex="1">
+          <mxGeometry height="240" width="240" x="640" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="medication" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8d4b5;strokeColor=#a86c1c;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;Medication&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #a86c1c;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- code: String&lt;br/&gt;- description: String&lt;br/&gt;- manufacturer: String&lt;br/&gt;- type: String&lt;br/&gt;- components: String&lt;br/&gt;- content: String&lt;br/&gt;- packaging: String&lt;br/&gt;- minStock: Integer&lt;/div&gt;" vertex="1">
+          <mxGeometry height="220" width="240" x="1140" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="batch" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8d4b5;strokeColor=#a86c1c;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;Batch&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #a86c1c;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- batchNumber: String&lt;br/&gt;- arrivalDate: Date&lt;br/&gt;- expirationDate: Date&lt;br/&gt;- initialQuantity: Integer&lt;br/&gt;- availableQuantity: Integer&lt;/div&gt;" vertex="1">
+          <mxGeometry height="170" width="240" x="1400" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="writeOff" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffeb3b;strokeColor=#fbc02d;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;WriteOff&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #fbc02d;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- reason: WriteOffReason&lt;br/&gt;- quantity: Integer&lt;br/&gt;- status: WriteOffStatus&lt;br/&gt;- expiredAt: Date&lt;br/&gt;- discardDate: Date [0..1]&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="240" x="1660" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="patientCard" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;PatientCard&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #82b366;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- number: String&lt;br/&gt;- issueDate: Date&lt;/div&gt;" vertex="1">
+          <mxGeometry height="90" width="240" x="40" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="guardian" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;Guardian&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #82b366;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- rut: String&lt;br/&gt;- firstName: String&lt;br/&gt;- lastName: String&lt;br/&gt;- phone: String&lt;br/&gt;- email: String&lt;br/&gt;- relationship: String&lt;br/&gt;- authorizationDate: Date&lt;/div&gt;" vertex="1">
+          <mxGeometry height="210" width="240" x="320" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="prescriptionItem" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;PrescriptionItem&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #9673a6;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- dosesPerInterval: Integer&lt;br/&gt;- intervalHours: Integer&lt;br/&gt;- doseDescription: String&lt;br/&gt;- durationDays: Integer&lt;br/&gt;- totalQuantity: Integer&lt;/div&gt;" vertex="1">
+          <mxGeometry height="150" width="240" x="640" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="stock" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8d4b5;strokeColor=#a86c1c;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;Stock&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #a86c1c;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- availableQuantity: Integer&lt;br/&gt;- reservedQuantity: Integer&lt;br/&gt;- physicalQuantity: Integer&lt;/div&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #a86c1c;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;+ increment(n: Integer): void&lt;br/&gt;+ decrement(n: Integer): void&lt;br/&gt;+ reserve(n: Integer): void&lt;br/&gt;+ isCritical(): Boolean&lt;/div&gt;" vertex="1">
+          <mxGeometry height="200" width="240" x="1140" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="medicationLog" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;MedicationLog&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #82b366;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- createdAt: Date&lt;/div&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #82b366;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;+ consultHistory(): List&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="240" x="40" y="920" as="geometry" />
+        </mxCell>
+        <mxCell id="medicationDelivery" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffeb3b;strokeColor=#fbc02d;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;MedicationDelivery&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #fbc02d;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- deliveryDate: DateTime&lt;br/&gt;- pickerType: PickerType&lt;br/&gt;- thirdPartyRut: String [0..1]&lt;br/&gt;- thirdPartyName: String [0..1]&lt;/div&gt;" vertex="1">
+          <mxGeometry height="150" width="240" x="640" y="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="deliveryBatch" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffeb3b;strokeColor=#fbc02d;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;DeliveryBatch&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #fbc02d;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- quantity: Integer&lt;/div&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="1140" y="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="notification" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;Notification&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #b85450;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- type: NotificationType&lt;br/&gt;- event: NotificationEvent&lt;br/&gt;- message: String&lt;br/&gt;- sentAt: DateTime&lt;br/&gt;- status: DeliveryStatus&lt;/div&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #b85450;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;+ send(): Boolean&lt;/div&gt;" vertex="1">
+          <mxGeometry height="210" width="240" x="640" y="1280" as="geometry" />
+        </mxCell>
+        <mxCell id="report" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=center;fontSize=11;spacingTop=6;spacingLeft=6;spacingRight=6;spacingBottom=6;" value="&lt;b&gt;Report&lt;/b&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #b85450;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;- id: Integer&lt;br/&gt;- reportType: ReportType&lt;br/&gt;- generatedAt: DateTime&lt;br/&gt;- parameters: String&lt;/div&gt;&lt;hr style=&quot;margin:4px 0;border:0;border-top:1px solid #b85450;&quot;/&gt;&lt;div style=&quot;text-align:left;&quot;&gt;+ generate(): void&lt;br/&gt;+ export(): File&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="240" x="1140" y="1280" as="geometry" />
+        </mxCell>
+        <mxCell id="leyendaBox" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;align=center;fontSize=11;spacingTop=6;dashed=1;" value="&lt;b&gt;Leyenda&lt;/b&gt;" vertex="1">
+          <mxGeometry height="280" width="350" x="1500" y="1280" as="geometry" />
+        </mxCell>
+        <mxCell id="leyComposicion" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" value="Composición (parte de)" vertex="1">
+          <mxGeometry height="20" width="220" x="1560" y="1315" as="geometry" />
+        </mxCell>
+        <mxCell id="leyComposicionLine" edge="1" parent="1" style="startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;html=1;edgeStyle=none;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1515" y="1325" as="sourcePoint" />
+            <mxPoint x="1555" y="1325" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leyAsociacion" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" value="Asociación dirigida" vertex="1">
+          <mxGeometry height="20" width="220" x="1560" y="1345" as="geometry" />
+        </mxCell>
+        <mxCell id="leyAsociacionLine" edge="1" parent="1" style="endArrow=open;endSize=10;html=1;edgeStyle=none;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1515" y="1355" as="sourcePoint" />
+            <mxPoint x="1555" y="1355" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leyBidireccional" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" value="Asociación bidireccional" vertex="1">
+          <mxGeometry height="20" width="220" x="1560" y="1375" as="geometry" />
+        </mxCell>
+        <mxCell id="leyBidireccionalLine" edge="1" parent="1" style="endArrow=none;startArrow=none;html=1;edgeStyle=none;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1515" y="1385" as="sourcePoint" />
+            <mxPoint x="1555" y="1385" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leyMultiplicidad" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" value="1 . . *   →  cardinalidades" vertex="1">
+          <mxGeometry height="20" width="260" x="1515" y="1405" as="geometry" />
+        </mxCell>
+        <mxCell id="leyGrupos" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=9;whiteSpace=wrap;" value="&lt;b&gt;Colores por bounded context&lt;/b&gt;&lt;br&gt;&lt;b&gt;Azul&lt;/b&gt; — Identity: User (autenticación)&lt;br&gt;&lt;b&gt;Verde&lt;/b&gt; — Patient: Patient, Guardian, PatientCard, MedicationLog&lt;br&gt;&lt;b&gt;Marrón&lt;/b&gt; — Inventory (estado): Medication, Stock, Batch&lt;br&gt;&lt;b&gt;Amarillo&lt;/b&gt; — Eventos auditables (Inventory + Prescription): WriteOff, MedicationDelivery, DeliveryBatch&lt;br&gt;&lt;b&gt;Morado&lt;/b&gt; — Prescription: Prescription, PrescriptionItem&lt;br&gt;&lt;b&gt;Rojo&lt;/b&gt; — Outputs externos: Notification, Report" vertex="1">
+          <mxGeometry height="125" width="320" x="1515" y="1430" as="geometry" />
+        </mxCell>
+        <mxCell id="e_patient_guardian" edge="1" parent="1" source="patient" style="endArrow=none;startArrow=none;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="guardian">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="300" y="645" />
+              <mxPoint x="300" y="770" />
+              <mxPoint x="440" y="770" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_guardian_src" connectable="0" parent="e_patient_guardian" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_guardian_tgt" connectable="0" parent="e_patient_guardian" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_card" edge="1" parent="1" source="patient" style="startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="patientCard">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_patient_card_tgt" connectable="0" parent="e_patient_card" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_card_log" edge="1" parent="1" source="patientCard" style="startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="medicationLog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_card_log_tgt" connectable="0" parent="e_card_log" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_doctor_prescription" edge="1" parent="1" source="user" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="prescription" value="emite {role=DOCTOR}">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_doctor_prescription_src" connectable="0" parent="e_doctor_prescription" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_doctor_prescription_tgt" connectable="0" parent="e_doctor_prescription" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_prescription" edge="1" parent="1" source="patient" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="prescription" value="recibe">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="290" y="510" />
+              <mxPoint x="760" y="510" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_prescription_src" connectable="0" parent="e_patient_prescription" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_prescription_tgt" connectable="0" parent="e_patient_prescription" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_prescription_line" edge="1" parent="1" source="prescription" style="startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="prescriptionItem">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_prescription_line_tgt" connectable="0" parent="e_prescription_line" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_line_medication" edge="1" parent="1" source="prescriptionItem" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" target="medication" value="referencia">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1030" y="875" />
+              <mxPoint x="1030" y="760" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_line_medication_src" connectable="0" parent="e_line_medication" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_line_medication_tgt" connectable="0" parent="e_line_medication" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_medication_stock" edge="1" parent="1" source="medication" style="startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="stock">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_medication_stock_tgt" connectable="0" parent="e_medication_stock" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_medication_batch" edge="1" parent="1" source="medication" style="startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="batch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_medication_batch_tgt" connectable="0" parent="e_medication_batch" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_batch_writeoff" edge="1" parent="1" source="batch" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" target="writeOff" value="afectada por">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_batch_writeoff_src" connectable="0" parent="e_batch_writeoff" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_batch_writeoff_tgt" connectable="0" parent="e_batch_writeoff" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_prescription_delivery" edge="1" parent="1" source="prescription" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="medicationDelivery" value="dispensa">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="1155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_prescription_delivery_src" connectable="0" parent="e_prescription_delivery" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_prescription_delivery_tgt" connectable="0" parent="e_prescription_delivery" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_delivery" edge="1" parent="1" source="user" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" target="medicationDelivery" value="registra {role=PHARMACY_STAFF}">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="1030" />
+              <mxPoint x="688" y="1030" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_delivery_src" connectable="0" parent="e_staff_delivery" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_delivery_tgt" connectable="0" parent="e_staff_delivery" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_delivery_deliveryBatch" edge="1" parent="1" source="medicationDelivery" target="deliveryBatch" style="startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_delivery_deliveryBatch_tgt" connectable="0" parent="e_delivery_deliveryBatch" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_batch_deliveryBatch" edge="1" parent="1" source="batch" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="deliveryBatch" value="referencia">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1400" y="1130" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_batch_deliveryBatch_src" connectable="0" parent="e_batch_deliveryBatch" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_batch_deliveryBatch_tgt" connectable="0" parent="e_batch_deliveryBatch" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_log_delivery" edge="1" parent="1" source="medicationLog" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" target="medicationDelivery" value="historial">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="1032" />
+              <mxPoint x="600" y="1230" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_log_delivery_src" connectable="0" parent="e_log_delivery" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_log_delivery_tgt" connectable="0" parent="e_log_delivery" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_writeoff" edge="1" parent="1" source="user" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="writeOff" value="registra {role=PHARMACY_STAFF}">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="510" />
+              <mxPoint x="1780" y="510" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_writeoff_src" connectable="0" parent="e_staff_writeoff" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_writeoff_tgt" connectable="0" parent="e_staff_writeoff" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_notification" edge="1" parent="1" source="patient" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="notification" value="recibe">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="20" y="1255" />
+              <mxPoint x="610" y="1255" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_notification_src" connectable="0" parent="e_patient_notification" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_patient_notification_tgt" connectable="0" parent="e_patient_notification" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_guardian_notification" edge="1" parent="1" source="guardian" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" target="notification" value="destino alt.">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="440" y="1255" />
+              <mxPoint x="610" y="1255" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_guardian_notification_src" connectable="0" parent="e_guardian_notification" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_guardian_notification_tgt" connectable="0" parent="e_guardian_notification" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_report" edge="1" parent="1" source="user" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="report" value="genera {role=PHARMACY_STAFF}">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="1255" />
+              <mxPoint x="1100" y="1255" />
+              <mxPoint x="1100" y="1375" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_report_src" connectable="0" parent="e_staff_report" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_staff_report_tgt" connectable="0" parent="e_staff_report" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_prescription_notification" edge="1" parent="1" source="prescription" style="endArrow=open;endSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=10;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;" target="notification" value="avisa disponibilidad">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="1255" />
+              <mxPoint x="900" y="1255" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_prescription_notification_src" connectable="0" parent="e_prescription_notification" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_prescription_notification_tgt" connectable="0" parent="e_prescription_notification" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

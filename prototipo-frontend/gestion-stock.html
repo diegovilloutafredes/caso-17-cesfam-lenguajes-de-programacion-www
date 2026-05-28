@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de Stock — CESFAM</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar" data-role="pharmacy"></aside>
+
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>Gestión de Stock</h1>
+        <p>Control de inventario de medicamentos</p>
+      </div>
+      <div class="row">
+        <button class="btn btn-outline btn-sm" onclick="openModal('mReport')">Generar informe .CSV</button>
+        <button class="btn btn-primary" onclick="openModal('mAddStock')">＋ Ingresar Stock</button>
+      </div>
+    </header>
+
+    <!-- KPI's -->
+    <section class="grid grid-4 mb-4">
+      <div class="card kpi info"><div class="kpi-icon">📦</div><div><div class="kpi-num">8</div><div class="kpi-label">Total medicamentos</div></div></div>
+      <div class="card kpi success"><div class="kpi-icon">✓</div><div><div class="kpi-num">4</div><div class="kpi-label">Disponibles</div></div></div>
+      <div class="card kpi warning"><div class="kpi-icon">⚠</div><div><div class="kpi-num">2</div><div class="kpi-label">Stock bajo</div></div></div>
+      <div class="card kpi danger"><div class="kpi-icon">⨯</div><div><div class="kpi-num">2</div><div class="kpi-label">Sin stock</div></div></div>
+    </section>
+
+    <!-- Alertas críticas -->
+    <div class="card mb-4">
+      <h2>⚠ Alertas Críticas de Stock (4)</h2>
+      <div class="grid grid-2">
+        <div class="list-card">
+          <div class="meta"><strong>Ibuprofeno 500mg</strong><small>Stock: 180 unidades / Mínimo: 200</small></div>
+          <span class="badge warning">Stock bajo</span>
+        </div>
+        <div class="list-card">
+          <div class="meta"><strong>Paracetamol 500mg</strong><small>Stock: 450 unidades / Mínimo: 500</small></div>
+          <span class="badge warning">Stock bajo</span>
+        </div>
+        <div class="list-card">
+          <div class="meta"><strong>Aspirina 500mg</strong><small>Stock: 50 / Mínimo: 500</small></div>
+          <span class="badge danger">Crítico</span>
+        </div>
+        <div class="list-card">
+          <div class="meta"><strong>Amoxicilina 500mg</strong><small>Stock: 0 / Mínimo: 150</small></div>
+          <span class="badge danger">Sin stock</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventario -->
+    <div class="card">
+      <div class="row-between mb-3">
+        <h2 class="mt-0">Inventario de Medicamentos</h2>
+        <div class="search-bar">
+          <input class="input" type="text" placeholder="Buscar medicamento, código o fabricante...">
+        </div>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Medicamento</th><th>Stock Actual</th><th>Stock Mínimo</th>
+            <th>Estado</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><button class="link-btn" onclick="viewMedicineDetail('Paracetamol 500mg')"><strong>Paracetamol 500mg</strong></button><br><small>MED-0001</small></td>
+            <td>450 unidades</td><td>200 unidades</td>
+            <td><span class="badge success">Disponible</span></td>
+            <td class="actions">
+              <button class="btn btn-outline btn-sm" onclick="viewMedicineDetail('Paracetamol 500mg')">Ver detalle</button>
+              <button class="btn btn-primary btn-sm" onclick="openModal('mAddStock')">Agregar Stock</button>
+              <button class="btn btn-outline btn-sm" onclick="openModal('mWriteOff')">– Dar de baja</button>
+            </td>
+          </tr>
+          <tr>
+            <td><button class="link-btn" onclick="viewMedicineDetail('Ibuprofeno 400mg')"><strong>Ibuprofeno 400mg</strong></button><br><small>MED-0002</small></td>
+            <td>180 unidades</td><td>200 unidades</td>
+            <td><span class="badge warning">Stock bajo</span></td>
+            <td class="actions">
+              <button class="btn btn-outline btn-sm" onclick="viewMedicineDetail('Ibuprofeno 400mg')">Ver detalle</button>
+              <button class="btn btn-primary btn-sm" onclick="openModal('mAddStock')">Agregar Stock</button>
+              <button class="btn btn-outline btn-sm" onclick="openModal('mWriteOff')">– Dar de baja</button>
+            </td>
+          </tr>
+          <tr>
+            <td><button class="link-btn" onclick="viewMedicineDetail('Amoxicilina 500mg')"><strong>Amoxicilina 500mg</strong></button><br><small>MED-0003</small></td>
+            <td>320 unidades</td><td>150 unidades</td>
+            <td><span class="badge danger">Sin stock</span></td>
+            <td class="actions">
+              <button class="btn btn-outline btn-sm" onclick="viewMedicineDetail('Amoxicilina 500mg')">Ver detalle</button>
+              <button class="btn btn-primary btn-sm" onclick="openModal('mAddStock')">Agregar Stock</button>
+              <button class="btn btn-outline btn-sm" onclick="openModal('mWriteOff')">– Dar de baja</button>
+            </td>
+          </tr>
+          <tr>
+            <td><button class="link-btn" onclick="viewMedicineDetail('Omeprazol 20mg')"><strong>Omeprazol 20mg</strong></button><br><small>MED-0004</small></td>
+            <td>620 unidades</td><td>200 unidades</td>
+            <td><span class="badge success">Disponible</span></td>
+            <td class="actions">
+              <button class="btn btn-outline btn-sm" onclick="viewMedicineDetail('Omeprazol 20mg')">Ver detalle</button>
+              <button class="btn btn-primary btn-sm" onclick="openModal('mAddStock')">Agregar Stock</button>
+              <button class="btn btn-outline btn-sm" onclick="openModal('mWriteOff')">– Dar de baja</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- Add stock modal -->
+<div id="mAddStock" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>Ingresar Stock</h2>
+    <p class="modal-sub">Registrar una nueva partida de medicamentos.</p>
+    <div class="grid grid-2">
+      <div class="input-group">
+        <label>Medicamento</label>
+        <select class="select"><option>Seleccionar medicamento</option><option>Paracetamol 500mg</option><option>Ibuprofeno 400mg</option></select>
+      </div>
+      <div class="input-group">
+        <label>N° Partida</label>
+        <input class="input" type="text" placeholder="Ej: P-2026-001">
+      </div>
+      <div class="input-group">
+        <label>Cantidad inicial</label>
+        <input class="input" type="number" placeholder="Ej: 500">
+      </div>
+      <div class="input-group">
+        <label>Fecha de vencimiento</label>
+        <input class="input" type="date">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('mAddStock')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('mAddStock'); showToast('Partida registrada', 'Stock actualizado.', 'success');">Guardar partida</button>
+    </div>
+  </div>
+</div>
+
+<!-- Write-off modal -->
+<div id="mWriteOff" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>Dar de baja medicamento</h2>
+    <p class="modal-sub">Descontar del stock disponible. Si se desecha, también del stock físico.</p>
+    <div class="grid grid-2">
+      <div class="input-group">
+        <label>Motivo</label>
+        <select class="select">
+          <option>Seleccionar motivo</option>
+          <option>Fecha de vencimiento</option>
+          <option>Mal estado</option>
+          <option>Envase roto</option>
+          <option>Otro</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Cantidad</label>
+        <input class="input" type="number" placeholder="Ej: 10">
+      </div>
+    </div>
+    <div class="input-group mt-3 row" style="flex-direction:row; align-items:center; gap:8px;">
+      <input type="checkbox" id="desechar">
+      <label for="desechar" style="margin:0;">Desechar físicamente (auditoría)</label>
+    </div>
+    <div class="input-group mt-3">
+      <label>Observaciones</label>
+      <textarea class="textarea" placeholder="Detalle del motivo..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('mWriteOff')">Cancelar</button>
+      <button class="btn btn-danger" onclick="closeModal('mWriteOff'); showToast('Baja registrada', 'Stock disponible descontado. Auditoría actualizada.', 'warning');">Confirmar baja</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV report modal -->
+<div id="mReport" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>Generar informe (.CSV)</h2>
+    <p class="modal-sub">Selecciona el tipo de informe a exportar.</p>
+    <div class="input-group">
+      <label>Tipo de informe</label>
+      <select class="select">
+        <option>STOCK</option>
+        <option>RESERVADOS</option>
+        <option>CADUCADOS</option>
+      </select>
+    </div>
+    <div class="grid grid-2 mt-3">
+      <div class="input-group"><label>Desde</label><input class="input" type="date"></div>
+      <div class="input-group"><label>Hasta</label><input class="input" type="date"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('mReport')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('mReport'); showToast('Informe generado', 'El archivo .CSV se descargará en breve.', 'success');">Descargar .CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- Medicine detail modal -->
+<div id="mMedicineDetail" class="modal-backdrop hidden">
+  <div class="modal modal-lg">
+    <div class="row-between" style="align-items:flex-start;">
+      <div>
+        <h2 id="md-name" style="margin:0;">Paracetamol 500mg</h2>
+        <p class="modal-sub" style="margin:4px 0 0;" id="md-code">Código MED-0001</p>
+      </div>
+      <span class="badge success">Disponible</span>
+    </div>
+
+    <div class="modal-section">
+      <h3>Identificación del producto</h3>
+      <div class="grid grid-2">
+        <div class="input-group"><label>Fabricante</label><input class="input" readonly value="Laboratorio Chile S.A."></div>
+        <div class="input-group"><label>Tipo</label><input class="input" readonly value="Genérico — Analgésico"></div>
+        <div class="input-group" style="grid-column: span 2;"><label>Componentes</label><input class="input" readonly value="Paracetamol (acetaminofén)"></div>
+        <div class="input-group"><label>Contenido</label><input class="input" readonly value="500 mg por comprimido"></div>
+        <div class="input-group"><label>Gramaje</label><input class="input" readonly value="Caja x 30 comprimidos"></div>
+        <div class="input-group"><label>Stock crítico</label><input class="input" readonly value="200 unidades"></div>
+        <div class="input-group"><label>Vía de administración</label><input class="input" readonly value="Oral"></div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Stock actual</h3>
+      <div class="grid grid-3">
+        <div class="card kpi success" style="margin:0;"><div class="kpi-icon">✓</div><div><div class="kpi-num">450</div><div class="kpi-label">Disponible</div></div></div>
+        <div class="card kpi warning" style="margin:0;"><div class="kpi-icon">⏱</div><div><div class="kpi-num">20</div><div class="kpi-label">Reservado</div></div></div>
+        <div class="card kpi info" style="margin:0;"><div class="kpi-icon">📦</div><div><div class="kpi-num">470</div><div class="kpi-label">Físico</div></div></div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Partidas vigentes</h3>
+      <table class="table">
+        <thead><tr><th>N° Partida</th><th>Ingreso</th><th>Vencimiento</th><th>Inicial</th><th>Disponible</th><th>Acción</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>P-25-001</strong></td>
+            <td>2025-12-01</td><td>2026-12-15</td><td>500</td><td>200</td>
+            <td><button class="btn btn-outline btn-sm" onclick="openModal('mWriteOff')">Baja</button></td>
+          </tr>
+          <tr>
+            <td><strong>P-26-003</strong></td>
+            <td>2026-03-15</td><td>2027-09-22</td><td>300</td><td>250</td>
+            <td><button class="btn btn-outline btn-sm" onclick="openModal('mWriteOff')">Baja</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('mMedicineDetail')">Cerrar</button>
+      <button class="btn btn-primary" onclick="closeModal('mMedicineDetail'); openModal('mAddStock');">＋ Agregar partida</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/script.js"></script>
+</body>
+</html>

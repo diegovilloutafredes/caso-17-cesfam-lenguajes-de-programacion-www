@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buscar Paciente — CESFAM</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .pagination { display:flex; gap:6px; justify-content:center; margin-top:24px; }
+  .pagination button { width:36px; height:36px; border-radius:8px; border:1px solid var(--border); background:#fff; cursor:pointer; }
+  .pagination button.active { background: var(--brand); color:#fff; border-color: var(--brand); }
+  .pagination .gap { width:36px; display:grid; place-items:center; color:var(--text-soft); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar" id="sidebar" data-role="pharmacy"></aside>
+
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>Buscar paciente</h1>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="search-bar mb-3" style="max-width:none;">
+        <input class="input" type="text" placeholder="Buscar paciente por nombre o RUT...">
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr><th>Nombre</th><th>RUT</th><th>Acciones</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Gustavo Gonzalez</td><td>13.464.215-7</td><td><button class="btn btn-primary btn-sm" onclick="openModal('mPatientInfo')">Ver info</button></td></tr>
+          <tr><td>Samuel Jackson</td><td>13.464.215-7</td><td><button class="btn btn-primary btn-sm" onclick="openModal('mPatientInfo')">Ver info</button></td></tr>
+          <tr><td>Matias Babos</td><td>13.464.215-7</td><td><button class="btn btn-primary btn-sm" onclick="openModal('mPatientInfo')">Ver info</button></td></tr>
+          <tr><td>Cristobal Ponce</td><td>13.464.215-7</td><td><button class="btn btn-primary btn-sm" onclick="openModal('mPatientInfo')">Ver info</button></td></tr>
+          <tr><td>Pedro Gutierrez</td><td>13.464.215-7</td><td><button class="btn btn-primary btn-sm" onclick="openModal('mPatientInfo')">Ver info</button></td></tr>
+          <tr><td>Lucas Vergara</td><td>20.064.015-2</td><td><button class="btn btn-primary btn-sm" onclick="openModal('mPatientInfo')">Ver info</button></td></tr>
+          <tr><td>Lamine Yamal</td><td>17.893.242-K</td><td><button class="btn btn-primary btn-sm" onclick="openModal('mPatientInfo')">Ver info</button></td></tr>
+          <tr><td>Cristian Zapata</td><td>18.991.490-5</td><td><button class="btn btn-primary btn-sm" onclick="openModal('mPatientInfo')">Ver info</button></td></tr>
+        </tbody>
+      </table>
+
+      <nav class="pagination" aria-label="Paginación">
+        <button class="active">1</button>
+        <button>2</button>
+        <button>3</button>
+        <span class="gap">…</span>
+        <button>67</button>
+        <button>68</button>
+      </nav>
+    </div>
+
+  </main>
+</div>
+
+<!-- Patient info modal -->
+<div id="mPatientInfo" class="modal-backdrop hidden">
+  <div class="modal modal-lg">
+    <h2>Información del paciente</h2>
+    <p class="modal-sub">Carnet de paciente y formulario de medicamentos.</p>
+
+    <div class="grid grid-2">
+      <div class="input-group"><label>Nombre completo</label><input class="input" type="text" value="Gustavo González González" readonly></div>
+      <div class="input-group"><label>RUT</label><input class="input" type="text" value="13.464.215-7" readonly></div>
+      <div class="input-group"><label>Fecha de nacimiento</label><input class="input" type="text" value="1958-04-22" readonly></div>
+      <div class="input-group"><label>Carnet de Paciente</label><input class="input" type="text" value="CP-2024-13464" readonly></div>
+      <div class="input-group"><label>Teléfono</label><input class="input" type="text" value="+56 9 1234 9300" readonly></div>
+      <div class="input-group"><label>Email</label><input class="input" type="text" value="gustavo@correo.cl" readonly></div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Recetas activas</h3>
+      <div class="apoderado-row">
+        <div class="meta"><strong>R001 — Paracetamol 500mg</strong><small>20 unidades · Vence 2026-06-15</small></div>
+        <span class="badge success">Disponible</span>
+      </div>
+      <div class="apoderado-row">
+        <div class="meta"><strong>R045 — Enalapril 10mg</strong><small>30 unidades · Vence 2026-07-02 · Tratamiento prolongado</small></div>
+        <span class="badge warning">Reservado</span>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Apoderados autorizados</h3>
+      <div class="apoderado-row">
+        <div class="meta"><strong>María González</strong><small>12.345.678-9 · Esposa</small></div>
+        <span class="badge muted">Activo</span>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('mPatientInfo')">Cerrar</button>
+      <button class="btn btn-primary" onclick="closeModal('mPatientInfo'); showToast('Libreta exportada', 'PDF con historial generado.', 'info');">Exportar libreta</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/script.js"></script>
+</body>
+</html>
