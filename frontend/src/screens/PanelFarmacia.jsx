@@ -7,12 +7,21 @@ import { Badge, Kpi, PageHeader, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
 import { prescriptionStatus, stockStatus } from '../lib/format'
 
+const TOP_WINDOWS = [
+  { days: 30, label: 'Últimos 30 días' },
+  { days: 90, label: 'Últimos 90 días' },
+  { days: 365, label: 'Último año' },
+  { days: 0, label: 'Todo el histórico' },
+]
+
 export default function PanelFarmacia() {
   const navigate = useNavigate()
   const { showToast } = useToast()
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [topMeds, setTopMeds] = useState([])
+  const [topDays, setTopDays] = useState(90)
 
   // Modal "Sin stock" (al preparar una prescripción sin existencias).
   const [stockRx, setStockRx] = useState(null)
@@ -36,10 +45,22 @@ export default function PanelFarmacia() {
     try {
       const d = await dashboardsApi.pharmacy()
       setData(d)
+      setTopMeds(d.topMedications || [])
+      setTopDays(90)
     } catch (err) {
       showToast('Error al cargar el panel', err.message, 'danger')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function changeTopWindow(days) {
+    setTopDays(days)
+    try {
+      const res = await dashboardsApi.pharmacyTopMedications(days)
+      setTopMeds(res.topMedications || [])
+    } catch (err) {
+      showToast('Error al cargar el top', err.message, 'danger')
     }
   }
 
@@ -138,7 +159,6 @@ export default function PanelFarmacia() {
   const stockAlerts = data?.stockAlerts || []
   const stockSummary = data?.stockSummary
   const stockTop = data?.stockTop || []
-  const topMeds = data?.topMedications || []
 
   const topData = topMeds.length > 0 && {
     labels: topMeds.map((m) => m.description),
@@ -192,7 +212,22 @@ export default function PanelFarmacia() {
 
           {/* Reportería de inventario y demanda */}
           <section className="grid grid-3 mb-4">
-            <ChartCard title="Top medicamentos recetados" subtitle="Demanda → prioridad de reposición">
+            <ChartCard
+              title="Top medicamentos recetados"
+              subtitle={TOP_WINDOWS.find((w) => w.days === topDays)?.label || 'Demanda reciente'}
+              actions={
+                <select
+                  className="select"
+                  style={{ width: 'auto' }}
+                  value={topDays}
+                  onChange={(e) => changeTopWindow(Number(e.target.value))}
+                >
+                  {TOP_WINDOWS.map((w) => (
+                    <option key={w.days} value={w.days}>{w.label}</option>
+                  ))}
+                </select>
+              }
+            >
               {topData ? <Bar data={topData} options={horizontalOptions} /> : <Empty>Sin datos.</Empty>}
             </ChartCard>
             <ChartCard title="Distribución de stock" subtitle="Salud del inventario">

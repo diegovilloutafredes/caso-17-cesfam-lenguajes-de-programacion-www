@@ -47,8 +47,18 @@ def test_doctor_dashboard(client, auth):
 
 def test_pharmacy_dashboard(client, pharmacy_auth):
     d = client.get("/api/v1/pharmacy/dashboard", headers=pharmacy_auth).json()["data"]
-    assert {"kpis", "queue", "stockAlerts", "stockSummary", "stockTop", "topMedications"} <= d.keys()
+    expected = {"kpis", "queue", "stockAlerts", "stockSummary", "stockTop",
+                "topMedications", "topMedicationsWindow"}
+    assert expected <= d.keys()
     assert d["stockSummary"]["totalMedications"] == 14
+
+
+def test_pharmacy_top_medications_window(client, pharmacy_auth):
+    d = client.get("/api/v1/pharmacy/top-medications?days=90", headers=pharmacy_auth).json()["data"]
+    assert d["window"]["days"] == 90
+    assert isinstance(d["topMedications"], list)
+    allt = client.get("/api/v1/pharmacy/top-medications?days=0", headers=pharmacy_auth).json()["data"]
+    assert allt["window"]["days"] == 0
 
 
 # --- Proxy a servicios de dominio ------------------------------------------

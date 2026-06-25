@@ -83,6 +83,7 @@ export const notificationsApi = {
 export const dashboardsApi = {
   doctor: () => api.get('/api/v1/doctor/dashboard'),
   pharmacy: () => api.get('/api/v1/pharmacy/dashboard'),
+  pharmacyTopMedications: (days) => api.get('/api/v1/pharmacy/top-medications', { params: { days } }),
 }
 
 // Reportes devuelven CSV (texto plano), no envelope.

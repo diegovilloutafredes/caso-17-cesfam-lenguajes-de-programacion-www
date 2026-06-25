@@ -5,6 +5,7 @@ Combina datos de inventory, patient y prescription.
 """
 
 from collections import Counter, defaultdict
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
 
@@ -57,6 +58,36 @@ def _stock_status(m: dict) -> str:
     return "AVAILABLE"
 
 
+_DEFAULT_TOP_DAYS = 90
+_DEMAND_EXCLUDED = {"CANCELLED", "EXPIRED"}
+
+
+def _window(days: int) -> tuple:
+    """Ventana de N días: (corte ISO o None si es todo el histórico, descriptor para el panel)."""
+    if not days or days <= 0:
+        return None, {"days": 0, "from": None, "to": None}
+    today = date.today()
+    cutoff = today - timedelta(days=days)
+    return cutoff.isoformat(), {"days": days, "from": cutoff.isoformat(), "to": today.isoformat()}
+
+
+def _top_medications(prescriptions: list, med_name: dict, cutoff) -> list:
+    """Unidades recetadas por medicamento en la ventana, sin contar anuladas ni vencidas."""
+    demand: dict = defaultdict(int)
+    for p in prescriptions:
+        if p.get("status") in _DEMAND_EXCLUDED:
+            continue
+        if cutoff and (p.get("emissionDate") or "") < cutoff:
+            continue
+        for item in p.get("items", []):
+            demand[item["medicationId"]] += item.get("totalQuantity", 0)
+    top = sorted(demand.items(), key=lambda kv: kv[1], reverse=True)[:6]
+    return [
+        {"medicationId": mid, "description": med_name.get(mid, mid), "quantity": qty}
+        for mid, qty in top
+    ]
+
+
 @router.get("/doctor/dashboard")
 def doctor_dashboard(
     _user: dict = Depends(current_user),
@@ -106,16 +137,9 @@ def pharmacy_dashboard(
 
     med_name = {m["id"]: m["description"] for m in meds}
 
-    # Top medicamentos recetados (demanda agregada por unidades → prioridad de reposición).
-    demand: dict = defaultdict(int)
-    for p in prescriptions:
-        for item in p.get("items", []):
-            demand[item["medicationId"]] += item.get("totalQuantity", 0)
-    top = sorted(demand.items(), key=lambda kv: kv[1], reverse=True)[:6]
-    top_medications = [
-        {"medicationId": mid, "description": med_name.get(mid, mid), "quantity": qty}
-        for mid, qty in top
-    ]
+    # Top recetados de los últimos 90 días por defecto; el selector del panel pide otras ventanas.
+    cutoff, window = _window(_DEFAULT_TOP_DAYS)
+    top_medications = _top_medications(prescriptions, med_name, cutoff)
 
     return ok({
         "kpis": {
@@ -138,4 +162,22 @@ def pharmacy_dashboard(
             for m in meds[:6]
         ],
         "topMedications": top_medications,
+        "topMedicationsWindow": window,
+    })
+
+
+@router.get("/pharmacy/top-medications")
+def pharmacy_top_medications(
+    days: int = _DEFAULT_TOP_DAYS,
+    _user: dict = Depends(current_user),
+    token: str = Depends(current_token),
+):
+    """Top recetados en una ventana de tiempo (días); days=0 = todo el histórico."""
+    prescriptions = _as_list(prescription_client.list_all(token=token))
+    meds = _as_list(inventory_client.list_medications(token=token, limit=50))
+    med_name = {m["id"]: m["description"] for m in meds}
+    cutoff, window = _window(days)
+    return ok({
+        "topMedications": _top_medications(prescriptions, med_name, cutoff),
+        "window": window,
     })
