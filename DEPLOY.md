@@ -39,18 +39,20 @@ cd ../frontend
 npm install && npm run dev         # Vite en :5173, consume http://localhost:8000
 ```
 
-## 1. Backend — Railway
+## 1. Backend — Railway (CLI, sin push a GitHub)
 
-1. Crear cuenta en [railway.com](https://railway.com) con el plan **Hobby** ($5/mes).
-   **No** uses el Trial: limita a 5 servicios por proyecto.
-2. **New Project → Deploy from GitHub repo** → conectar este repositorio.
-   En el servicio creado, abrir **Settings**:
-   - **Root Directory:** `backend-microservices`
-   - **Branch:** `deploy/railway` (o `main` tras el merge)
-   - **Build:** Railway detecta el `Dockerfile` en el root directory.
-   - **Deploy → Start Command:** `sh railway-start.sh`
-3. **New → Database → Add PostgreSQL.** Crea un servicio `Postgres` en el proyecto.
-   Las 5 bases (`identity_db`, …) se crean solas al arrancar (`railway-start.sh`).
+Se despliega el código local directo con la CLI; no requiere subir nada al repositorio.
+El build (Dockerfile) y el arranque (`sh railway-start.sh`) ya van declarados en
+`backend-microservices/railway.json`.
+
+1. Cuenta en [railway.com](https://railway.com), plan **Hobby** ($5/mes) — no el Trial.
+   Instalar la CLI: `npm i -g @railway/cli`.
+2. `railway login` (abre el navegador con tu cuenta).
+3. Desde `backend-microservices/`:
+   - `railway init` → crea el proyecto (ej. `cesfam`).
+   - `railway add --database postgres` → agrega el Postgres del proyecto.
+   - `railway up` → sube el código local, construye con el Dockerfile y arranca los 7
+     procesos. Las 5 bases (`identity_db`, …) se crean solas al iniciar.
 4. En el servicio del backend, **Variables** (referencian al Postgres del proyecto):
 
    | Variable | Valor |
@@ -63,8 +65,11 @@ npm install && npm run dev         # Vite en :5173, consume http://localhost:800
    | `CORS_ORIGINS` | (se completa en el paso 3, con el dominio de Vercel) |
 
    > Si el servicio Postgres tiene otro nombre, ajustar el prefijo `${{NOMBRE.…}}`.
-5. **Settings → Networking → Generate Domain** en el servicio del backend → URL pública
-   del gateway: `https://<algo>.up.railway.app`. Verificar `…/health` → `{"status":"ok"}`.
+5. `railway domain` (o Settings → Networking → Generate Domain) → URL pública del gateway:
+   `https://<algo>.up.railway.app`. Verificar `…/health` → `{"status":"ok"}`.
+
+> Alternativa con GitHub (cuando se pushee la rama): New Project → Deploy from GitHub repo,
+> Root Directory `backend-microservices`, branch `deploy/railway`; el `railway.json` aplica igual.
 
 ## 2. Frontend — Vercel
 
