@@ -45,7 +45,7 @@ build:  ## Build de producción del frontend
 deploy-back:  ## Despliega el backend a la nube (Railway)
 	./scripts/deploy-backend.sh
 
-deploy-front:  ## Despliega el frontend a la nube (Vercel, preview). Requiere VITE_API_URL
+deploy-front:  ## Despliega el frontend a la nube (Vercel). Requiere VITE_API_URL
 	./scripts/deploy-frontend.sh
 
 cloud-status:  ## Estado del despliegue del backend en Railway

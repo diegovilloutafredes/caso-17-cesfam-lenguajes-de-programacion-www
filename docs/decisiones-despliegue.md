@@ -1,13 +1,13 @@
 # Despliegue CESFAM — proceso y decisiones (ambiente de desarrollo)
 
-> Todo el despliegue es de **desarrollo / demo**: nada se promueve a producción. Datos de
+> Todo el despliegue es de **desarrollo / demo**: sin ambiente productivo real. Datos de
 > seed, vida corta (hasta el 8 de julio). **Sin pipelines de CI/CD**: el deploy se hace a
 > mano con scripts locales (`make deploy-back`, `make deploy-front`).
 
 ## Arquitectura desplegada
 
 ```
-Vercel (React/Vite, preview)  ──HTTPS──>  Railway (1 servicio = 7 procesos uvicorn)
+Vercel (React/Vite)  ──HTTPS──>  Railway (1 servicio = 7 procesos uvicorn)
                                               api_gateway (público)
                                                 │ HTTP localhost
                                                 └─ identity / patient / inventory /
@@ -33,7 +33,8 @@ El frontend usa **una sola base URL**: el ApiGateway (BFF).
 ### Frontend (Vercel)
 1. Vercel toma `frontend/` (Vite + rewrites SPA de `vercel.json`).
 2. `VITE_API_URL` = URL del gateway en Railway (en build).
-3. Deploy de **desarrollo (preview)**, no producción.
+3. Deploy publicado a la URL estable de Vercel (su *production* es solo el nombre del
+   deploy principal de un sitio estático, no infraestructura productiva).
 
 ## Decisiones y trade-offs
 

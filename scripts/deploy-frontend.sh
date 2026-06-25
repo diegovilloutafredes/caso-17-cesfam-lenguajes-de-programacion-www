@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# CESFAM — despliega el frontend a la nube (Vercel) desde local, como deploy de
-# DESARROLLO (preview, no producción). Requiere 'vercel login' (sesión en ~/.vercel,
-# FUERA del repo). Sin secretos en el repo: la URL del backend se pasa como build-env.
+# CESFAM — despliega el frontend a la nube (Vercel) desde local. Publica el deploy
+# principal (URL estable). Requiere 'vercel login' (sesión en ~/.vercel, FUERA del repo).
+# Sin secretos en el repo: la URL del backend se pasa como build-env.
 set -euo pipefail
 
 GREEN='\033[0;32m'; CYAN='\033[0;36m'; RED='\033[0;31m'; NC='\033[0m'
@@ -17,6 +17,6 @@ if [ -z "$API_URL" ]; then
 fi
 command -v vercel >/dev/null 2>&1 || { echo -e "${RED}Falta la CLI de Vercel: npm i -g vercel${NC}"; exit 1; }
 
-echo -e "${CYAN}▶ Desplegando frontend a Vercel (preview/develop), API=$API_URL ...${NC}"
-vercel deploy --yes --build-env VITE_API_URL="$API_URL"
+echo -e "${CYAN}▶ Desplegando frontend a Vercel (URL estable), API=$API_URL ...${NC}"
+vercel deploy --prod --yes --build-env VITE_API_URL="$API_URL"
 echo -e "${GREEN}Listo.${NC}"
