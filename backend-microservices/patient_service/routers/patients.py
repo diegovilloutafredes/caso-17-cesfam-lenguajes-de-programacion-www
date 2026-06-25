@@ -138,11 +138,9 @@ def get_history(
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    """Historial de medicamentos del paciente (la "Libreta de medicamentos" virtual).
+    """Libreta del paciente: sus datos locales más las recetas de prescription_service.
 
-    Cross-service: combina datos locales del paciente con prescripciones que viven
-    en prescription_service. Si prescription_service está caído, retorna patient
-    con listas vacías (degradación graceful via best-effort).
+    Si ese servicio no responde, devuelve al paciente con las listas vacías.
     """
     p = db.get(Patient, patient_id)
     if not p:

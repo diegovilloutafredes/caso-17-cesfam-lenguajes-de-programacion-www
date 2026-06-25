@@ -1,8 +1,7 @@
-"""Endpoints BFF — agregación cross-context para las pantallas de médico y farmacia.
+"""BFF: arma los dashboards de médico y farmacia en una sola llamada.
 
-Reducen N round-trips del frontend a 1 llamada por dashboard, combinando data de
-InventoryService, PatientService y PrescriptionService. Médico = clínico (estado de
-recetas, pacientes recientes); Farmacia = inventario/operación (stock, demanda, cola).
+Médico: estado de las recetas y pacientes recientes. Farmacia: stock, demanda y cola.
+Combina datos de inventory, patient y prescription.
 """
 
 from collections import Counter, defaultdict
@@ -21,7 +20,7 @@ inventory_client = InventoryServiceClient()
 patient_client = PatientServiceClient()
 prescription_client = PrescriptionServiceClient()
 
-# Estados de receta en orden de avance, para la reportería del médico.
+# estados en orden de avance
 _PRESCRIPTION_STATES = [
     "SUBMITTED", "RESERVED", "READY_FOR_PICKUP",
     "PICKED_UP", "EXTERNAL_PURCHASE", "CANCELLED", "EXPIRED",
@@ -72,8 +71,8 @@ def doctor_dashboard(
         for s in _PRESCRIPTION_STATES if counts.get(s, 0) > 0
     ]
 
-    # "Reciente" = paciente con la última receta emitida más nueva (actividad clínica),
-    # no por id de registro. Los pacientes sin recetas no aparecen como recientes.
+    # reciente = paciente con la última receta emitida más nueva (no por id);
+    # los pacientes sin recetas no aparecen.
     last_emission: dict = {}
     for p in prescriptions:
         pid, emitted = p.get("patientId"), p.get("emissionDate")

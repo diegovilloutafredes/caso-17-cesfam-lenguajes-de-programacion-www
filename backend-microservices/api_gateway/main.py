@@ -1,13 +1,7 @@
-"""ApiGateway (BFF) — punto de entrada del frontend.
+"""ApiGateway (BFF): entrada única del frontend.
 
-Expone:
-- POST /api/v1/auth/login (passthrough a IdentityService)
-- GET /api/v1/doctor/dashboard (agregación BFF)
-- GET /api/v1/pharmacy/dashboard (agregación BFF)
-
-Para endpoints no agregados (CRUD directo de pacientes, medicamentos, etc.) el
-frontend va directo a los servicios correspondientes. El gateway solo agrega
-cuando vale la pena (= reducir N round-trips a 1).
+Reenvía el login a IdentityService y arma los dashboards de médico y farmacia;
+el resto de los endpoints los pasa el proxy a cada servicio.
 """
 
 import os

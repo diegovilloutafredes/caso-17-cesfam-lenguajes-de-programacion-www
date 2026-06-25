@@ -228,10 +228,10 @@ def consume_physical(
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    """Decrementa physicalQuantity por asignaciones de batch. Llamado al entregar.
+    """Decrementa el físico por las partidas indicadas (al entregar).
 
-    **Atómico**: valida TODAS las partidas antes de mutar nada. Si alguna no existe,
-    falla sin haber tocado ningún contador — previene corrupción parcial de stock.
+    Valida todas las partidas antes de mutar: si una no existe o no alcanza, falla
+    sin tocar ningún contador.
     """
     # Fase 1: validación previa, ningún side-effect aún
     batches: dict[str, Batch] = {}

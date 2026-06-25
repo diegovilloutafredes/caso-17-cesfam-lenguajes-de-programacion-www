@@ -1,15 +1,8 @@
-"""Auth stub compartido por todos los servicios.
+"""Auth stub compartido por los servicios.
 
-Acepta cualquier Bearer y devuelve un usuario stub. En producción cada servicio
-validaría el JWT contra IdentityService o un keyset compartido.
-
-Usa `HTTPBearer` para que Swagger UI muestre el botón **Authorize** 🔓 arriba a la
-derecha y ofrezca pegar el token una sola vez para todos los endpoints.
-
-**Resolución del usuario por token**:
-- Si el token es `sandbox-token-USR-XXX` (formato emitido por `/auth/login`),
-  identifica al usuario por su id → permite testear flujos role-based.
-- Cualquier otro Bearer (ej: "x", "test") → fallback al doctor USR-001.
+Acepta cualquier Bearer y devuelve un usuario stub; en producción cada servicio
+validaría el JWT. Un token sandbox-token-USR-XXX resuelve a ese usuario (para probar
+flujos por rol); cualquier otro Bearer cae al doctor USR-001.
 """
 
 from typing import Optional
@@ -28,10 +21,8 @@ bearer_scheme = HTTPBearer(
 )
 
 
-# Espejo mínimo de los 3 usuarios del seed de identity_service.
-# Necesario acá porque cada servicio NO debería tener que llamar a identity_service
-# en cada request solo para resolver al usuario — el stub local cumple el rol.
-# En producción esto se reemplaza por validación JWT contra un keyset compartido.
+# Espejo de los usuarios del seed de identity_service, para resolver el usuario
+# sin llamar a ese servicio en cada request.
 KNOWN_USERS = {
     "USR-001": {
         "id": "USR-001",

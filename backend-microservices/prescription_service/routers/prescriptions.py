@@ -272,7 +272,7 @@ def mark_available(
     r.status = "READY_FOR_PICKUP"
     db.commit()
 
-    # Notificación best-effort (no bloquea la transición de estado)
+    # notificación opcional: no bloquea el cambio de estado
     try:
         patient_resp = patient_client.get_patient(r.patientId, token=token)
         patient = (patient_resp or {}).get("data") or {}
@@ -315,11 +315,10 @@ def cancel(
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    """Cualquier estado activo → CANCELLED. Si tenía stock reservado, lo libera.
+    """Estado activo → CANCELLED. Si tenía stock reservado (READY), lo libera.
 
-    **Modo strict**: si la liberación de stock falla (InventoryService caído),
-    NO se cancela la receta — se preserva la invariante `available+reserved=physical`.
-    El usuario puede reintentar cuando InventoryService vuelva.
+    Si la liberación falla (InventoryService caído) no cancela, para no romper la
+    invariante de stock; se reintenta cuando el servicio vuelva.
     """
     r = _get_locked(db, prescription_id)
     if not r:
@@ -330,7 +329,7 @@ def cancel(
             "message": f"Receta ya en estado terminal: {r.status}",
         })
 
-    # Libera stock si estaba reservado — strict: si falla, no cancelamos
+    # libera el stock reservado; si falla, no cancela
     if r.status == "READY_FOR_PICKUP":
         for item in r.items:
             resp = inventory_client.release_stock(
