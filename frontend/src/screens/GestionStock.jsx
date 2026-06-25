@@ -66,7 +66,8 @@ export default function GestionStock() {
   }, [search, showToast])
 
   useEffect(() => {
-    load()
+    const t = setTimeout(() => load(), 300)
+    return () => clearTimeout(t)
   }, [load])
 
   // Refresca todo lo dependiente tras una mutación; si el detalle está abierto, lo recarga.

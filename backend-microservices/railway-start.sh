@@ -1,8 +1,12 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Arranque del backend CESFAM como UN servicio en Railway: los 7 procesos uvicorn
 # co-locados en un contenedor. Los 6 servicios de dominio escuchan en localhost; el
 # gateway es el único público (0.0.0.0:$PORT). Las llamadas inter-servicio van por
 # HTTP localhost, así que no aplica la red privada IPv6 de Railway.
+#
+# Supervisión: si cualquiera de los 7 procesos termina, el script sale con error y
+# Railway (restartPolicyType ON_FAILURE) reinicia todo el contenedor; el trap propaga
+# el apagado a los 7. Requiere bash (wait -n no existe en sh/dash).
 set -eu
 
 : "${PGHOST:?falta PGHOST (referencia a la base Postgres de Railway)}"
@@ -45,13 +49,18 @@ export PRESCRIPTION_SERVICE_URL="http://127.0.0.1:8004"
 export NOTIFICATION_SERVICE_URL="http://127.0.0.1:8005"
 export REPORT_SERVICE_URL="http://127.0.0.1:8006"
 
-# 3) Cada servicio de dominio en su puerto local, con SU propia base.
+# 3) Propagar el apagado (SIGINT/SIGTERM de Railway) a todos los procesos hijos.
+trap 'kill 0' INT TERM
+
+# 4) Cada servicio de dominio en su puerto local con SU propia base; el gateway público.
 DATABASE_URL="${PGBASE}/identity_db"     uvicorn identity_service.main:app     --host 127.0.0.1 --port 8001 &
 DATABASE_URL="${PGBASE}/patient_db"      uvicorn patient_service.main:app      --host 127.0.0.1 --port 8002 &
 DATABASE_URL="${PGBASE}/inventory_db"    uvicorn inventory_service.main:app    --host 127.0.0.1 --port 8003 &
 DATABASE_URL="${PGBASE}/prescription_db" uvicorn prescription_service.main:app --host 127.0.0.1 --port 8004 &
 DATABASE_URL="${PGBASE}/notification_db" uvicorn notification_service.main:app --host 127.0.0.1 --port 8005 &
 uvicorn report_service.main:app --host 127.0.0.1 --port 8006 &
+uvicorn api_gateway.main:app --host 0.0.0.0 --port "${PORT:-8000}" &
 
-# 4) Gateway público como proceso principal del contenedor (recibe SIGTERM de Railway).
-exec uvicorn api_gateway.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+# 5) Si cualquiera de los 7 procesos termina, reiniciar todo el contenedor (ON_FAILURE).
+wait -n || true
+exit 1

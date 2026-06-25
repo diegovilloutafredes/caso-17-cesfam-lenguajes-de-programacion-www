@@ -103,6 +103,14 @@ export default function PanelFarmacia() {
       showToast('Datos incompletos', 'Indica el lote y una cantidad válida.', 'warning')
       return
     }
+    if (pickerType === 'guardian' && !guardianId) {
+      showToast('Datos incompletos', 'Selecciona el apoderado que retira.', 'warning')
+      return
+    }
+    if (pickerType === 'third_party' && (!thirdPartyRut || !thirdPartyName)) {
+      showToast('Datos incompletos', 'Indica el RUT y el nombre del tercero autorizado.', 'warning')
+      return
+    }
     setDeliverSubmitting(true)
     try {
       const body = {

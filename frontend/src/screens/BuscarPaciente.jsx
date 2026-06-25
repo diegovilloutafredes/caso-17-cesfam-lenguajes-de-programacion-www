@@ -47,24 +47,27 @@ export default function BuscarPaciente() {
   useEffect(() => {
     let active = true
     setLoading(true)
-    patientsApi
-      .list({ search, page, limit: LIMIT })
-      .then((res) => {
-        if (!active) return
-        setRows(res.data || [])
-        setTotal(res.pagination?.total || 0)
-      })
-      .catch((err) => {
-        if (!active) return
-        setRows([])
-        setTotal(0)
-        showToast('Error al buscar pacientes', err.message, 'danger')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
+    const t = setTimeout(() => {
+      patientsApi
+        .list({ search, page, limit: LIMIT })
+        .then((res) => {
+          if (!active) return
+          setRows(res.data || [])
+          setTotal(res.pagination?.total || 0)
+        })
+        .catch((err) => {
+          if (!active) return
+          setRows([])
+          setTotal(0)
+          showToast('Error al buscar pacientes', err.message, 'danger')
+        })
+        .finally(() => {
+          if (active) setLoading(false)
+        })
+    }, 300)
     return () => {
       active = false
+      clearTimeout(t)
     }
   }, [search, page, showToast])
 

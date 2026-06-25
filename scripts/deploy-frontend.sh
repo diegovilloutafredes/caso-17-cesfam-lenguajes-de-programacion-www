@@ -16,6 +16,7 @@ if [ -z "$API_URL" ]; then
   exit 1
 fi
 command -v vercel >/dev/null 2>&1 || { echo -e "${RED}Falta la CLI de Vercel: npm i -g vercel${NC}"; exit 1; }
+vercel whoami >/dev/null 2>&1 || { echo -e "${RED}Inicia sesión primero: vercel login${NC}"; exit 1; }
 
 echo -e "${CYAN}▶ Desplegando frontend a Vercel (URL estable), API=$API_URL ...${NC}"
 vercel deploy --prod --yes --build-env VITE_API_URL="$API_URL"

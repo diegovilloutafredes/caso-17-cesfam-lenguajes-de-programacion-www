@@ -1,3 +1,5 @@
+import csv
+import io
 from datetime import date
 from enum import Enum
 from typing import Optional
@@ -84,4 +86,7 @@ def generate_report(
                     "; ".join(f"{b['batchNumber']}({b['availableQuantity']})" for b in expired),
                 ])
 
-    return "\n".join(",".join(r) for r in rows)
+    # csv.writer escapa comas, comillas y saltos de línea en los campos de texto libre.
+    out = io.StringIO()
+    csv.writer(out).writerows(rows)
+    return out.getvalue()

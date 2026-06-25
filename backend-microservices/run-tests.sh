@@ -5,7 +5,7 @@
 # por el ApiGateway (api_gateway:8000).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-NET="$(docker network ls --format '{{.Name}}' | grep -E 'backend-microservices.*default' | head -1)"
+NET="$(docker network ls --format '{{.Name}}' | grep -E 'backend-microservices.*default' | head -1 || true)"
 NET="${NET:-backend-microservices_default}"
 docker run --rm --network "$NET" \
   -v "$HERE/tests:/tests:ro" -w /tests \
