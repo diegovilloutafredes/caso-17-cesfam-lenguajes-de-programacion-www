@@ -1,5 +1,9 @@
 """Seed local de PrescriptionService. Solo conoce recetas.
 Referencias a USR-* y PAT-* y MED-* son IDs externos (live en otros servicios).
+
+Los aportes a reserved (recetas RESERVED/READY_FOR_PICKUP) calzan con el reservedQuantity
+del seed de InventoryService: MED-0001=21, MED-0004=14, MED-0005=60, MED-0007=30,
+MED-0008=120, MED-0009=30, MED-0011=30.
 """
 
 from datetime import date
@@ -13,12 +17,12 @@ from prescription_service.models import Prescription, PrescriptionItem
 _SEED_PRESCRIPTIONS = [
     {
         "id": "R001", "doctorId": "USR-001", "patientId": "PAT-001",
-        "emissionDate": date(2026, 4, 15), "pickupDeadline": date(2026, 6, 15),
+        "emissionDate": date(2026, 6, 1), "pickupDeadline": date(2026, 8, 1),
         "treatmentType": "SHORT", "durationDays": 7,
         "status": "READY_FOR_PICKUP", "nextScheduledDelivery": None,
         "items": [
             {"medicationId": "MED-0001", "dosesPerInterval": 1, "intervalHours": 8,
-             "doseDescription": "1 cápsula c/8h", "durationDays": 7, "totalQuantity": 21},
+             "doseDescription": "1 comprimido c/8h", "durationDays": 7, "totalQuantity": 21},
         ],
     },
     {
@@ -48,7 +52,7 @@ _SEED_PRESCRIPTIONS = [
         "status": "SUBMITTED", "nextScheduledDelivery": date(2026, 6, 12),
         "items": [
             {"medicationId": "MED-0007", "dosesPerInterval": 1, "intervalHours": 24,
-             "doseDescription": "1 comp c/24h", "durationDays": 30, "totalQuantity": 30},
+             "doseDescription": "1 comprimido c/24h", "durationDays": 30, "totalQuantity": 30},
         ],
     },
     {
@@ -58,7 +62,7 @@ _SEED_PRESCRIPTIONS = [
         "status": "RESERVED", "nextScheduledDelivery": date(2026, 6, 2),
         "items": [
             {"medicationId": "MED-0005", "dosesPerInterval": 1, "intervalHours": 12,
-             "doseDescription": "1 comp c/12h", "durationDays": 30, "totalQuantity": 60},
+             "doseDescription": "1 comprimido c/12h", "durationDays": 30, "totalQuantity": 60},
         ],
     },
     {
@@ -68,7 +72,97 @@ _SEED_PRESCRIPTIONS = [
         "status": "PICKED_UP", "nextScheduledDelivery": None,
         "items": [
             {"medicationId": "MED-0002", "dosesPerInterval": 1, "intervalHours": 8,
-             "doseDescription": "1 comp c/8h", "durationDays": 5, "totalQuantity": 15},
+             "doseDescription": "1 comprimido c/8h", "durationDays": 5, "totalQuantity": 15},
+        ],
+    },
+    {
+        "id": "R050", "doctorId": "USR-001", "patientId": "PAT-002",
+        "emissionDate": date(2026, 6, 20), "pickupDeadline": date(2026, 8, 20),
+        "treatmentType": "LONG", "durationDays": 90,
+        "status": "READY_FOR_PICKUP", "nextScheduledDelivery": date(2026, 7, 20),
+        "items": [
+            {"medicationId": "MED-0008", "dosesPerInterval": 2, "intervalHours": 12,
+             "doseDescription": "2 comprimidos c/12h", "durationDays": 30, "totalQuantity": 120},
+        ],
+    },
+    {
+        "id": "R051", "doctorId": "USR-003", "patientId": "PAT-003",
+        "emissionDate": date(2026, 6, 18), "pickupDeadline": date(2026, 8, 18),
+        "treatmentType": "LONG", "durationDays": 90,
+        "status": "SUBMITTED", "nextScheduledDelivery": date(2026, 7, 18),
+        "items": [
+            {"medicationId": "MED-0008", "dosesPerInterval": 1, "intervalHours": 12,
+             "doseDescription": "1 comprimido c/12h", "durationDays": 30, "totalQuantity": 60},
+        ],
+    },
+    {
+        "id": "R052", "doctorId": "USR-001", "patientId": "PAT-004",
+        "emissionDate": date(2026, 6, 22), "pickupDeadline": date(2026, 8, 22),
+        "treatmentType": "LONG", "durationDays": 90,
+        "status": "RESERVED", "nextScheduledDelivery": date(2026, 7, 22),
+        "items": [
+            {"medicationId": "MED-0007", "dosesPerInterval": 1, "intervalHours": 24,
+             "doseDescription": "1 comprimido c/24h", "durationDays": 30, "totalQuantity": 30},
+        ],
+    },
+    {
+        "id": "R053", "doctorId": "USR-003", "patientId": "PAT-002",
+        "emissionDate": date(2026, 6, 15), "pickupDeadline": date(2026, 8, 15),
+        "treatmentType": "LONG", "durationDays": 90,
+        "status": "SUBMITTED", "nextScheduledDelivery": date(2026, 7, 15),
+        "items": [
+            {"medicationId": "MED-0005", "dosesPerInterval": 1, "intervalHours": 12,
+             "doseDescription": "1 comprimido c/12h", "durationDays": 30, "totalQuantity": 60},
+        ],
+    },
+    {
+        "id": "R054", "doctorId": "USR-001", "patientId": "PAT-003",
+        "emissionDate": date(2026, 6, 21), "pickupDeadline": date(2026, 8, 21),
+        "treatmentType": "LONG", "durationDays": 90,
+        "status": "READY_FOR_PICKUP", "nextScheduledDelivery": date(2026, 7, 21),
+        "items": [
+            {"medicationId": "MED-0009", "dosesPerInterval": 1, "intervalHours": 24,
+             "doseDescription": "1 comprimido c/24h", "durationDays": 30, "totalQuantity": 30},
+        ],
+    },
+    {
+        "id": "R055", "doctorId": "USR-003", "patientId": "PAT-004",
+        "emissionDate": date(2026, 6, 10), "pickupDeadline": date(2026, 8, 10),
+        "treatmentType": "LONG", "durationDays": 90,
+        "status": "PICKED_UP", "nextScheduledDelivery": None,
+        "items": [
+            {"medicationId": "MED-0009", "dosesPerInterval": 1, "intervalHours": 24,
+             "doseDescription": "1 comprimido c/24h", "durationDays": 30, "totalQuantity": 30},
+        ],
+    },
+    {
+        "id": "R056", "doctorId": "USR-001", "patientId": "PAT-002",
+        "emissionDate": date(2026, 6, 23), "pickupDeadline": date(2026, 8, 23),
+        "treatmentType": "SHORT", "durationDays": 7,
+        "status": "SUBMITTED", "nextScheduledDelivery": None,
+        "items": [
+            {"medicationId": "MED-0001", "dosesPerInterval": 1, "intervalHours": 8,
+             "doseDescription": "1 comprimido c/8h", "durationDays": 7, "totalQuantity": 21},
+        ],
+    },
+    {
+        "id": "R057", "doctorId": "USR-003", "patientId": "PAT-003",
+        "emissionDate": date(2026, 6, 19), "pickupDeadline": date(2026, 8, 19),
+        "treatmentType": "LONG", "durationDays": 90,
+        "status": "SUBMITTED", "nextScheduledDelivery": date(2026, 7, 19),
+        "items": [
+            {"medicationId": "MED-0010", "dosesPerInterval": 1, "intervalHours": 24,
+             "doseDescription": "1 comprimido c/24h", "durationDays": 30, "totalQuantity": 30},
+        ],
+    },
+    {
+        "id": "R058", "doctorId": "USR-001", "patientId": "PAT-004",
+        "emissionDate": date(2026, 6, 24), "pickupDeadline": date(2026, 8, 24),
+        "treatmentType": "LONG", "durationDays": 90,
+        "status": "RESERVED", "nextScheduledDelivery": date(2026, 7, 24),
+        "items": [
+            {"medicationId": "MED-0011", "dosesPerInterval": 1, "intervalHours": 24,
+             "doseDescription": "1 comprimido c/24h", "durationDays": 30, "totalQuantity": 30},
         ],
     },
 ]
@@ -103,7 +197,7 @@ def seed() -> None:
 def next_id(db: Session, prefix: str) -> str:
     """Próximo ID consultando el MAX del sufijo numérico en la BD.
 
-    Para R: el seed llega hasta R045 → próximo R046. Si no hay filas, parte en 100.
+    Para R: el seed llega hasta R058 → próximo R059. Si no hay filas, parte en 100.
     """
     pattern = f"{prefix}%"
     rows = db.execute(

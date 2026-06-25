@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { dashboardsApi, prescriptionsApi } from '../api'
 import Modal from '../components/Modal'
-import { Bar, ChartCard, CHART } from '../components/charts'
+import { Bar, Doughnut, ChartCard, CHART, baseOptions } from '../components/charts'
 import { Badge, Kpi, PageHeader, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
 import { prescriptionStatus, stockStatus } from '../lib/format'
@@ -136,20 +136,23 @@ export default function PanelFarmacia() {
   const kpis = data?.kpis || {}
   const queue = data?.queue || []
   const stockAlerts = data?.stockAlerts || []
+  const stockSummary = data?.stockSummary
+  const stockTop = data?.stockTop || []
+  const topMeds = data?.topMedications || []
 
-  const chartData = {
-    labels: ['Pendientes', 'Reservas activas', 'Listas para retiro'],
-    datasets: [
-      {
-        label: 'Prescripciones',
-        data: [
-          kpis.pendingPrescriptions || 0,
-          kpis.activeReservations || 0,
-          kpis.readyForPickup || 0,
-        ],
-        backgroundColor: [CHART.warning, CHART.info, CHART.success],
-      },
-    ],
+  const topData = topMeds.length > 0 && {
+    labels: topMeds.map((m) => m.description),
+    datasets: [{ label: 'Unidades recetadas', data: topMeds.map((m) => m.quantity), backgroundColor: CHART.primary }],
+  }
+  const horizontalOptions = { ...baseOptions, indexAxis: 'y', plugins: { legend: { display: false } } }
+
+  const distribData = stockSummary && {
+    labels: ['Disponibles', 'Stock bajo', 'Sin stock'],
+    datasets: [{ data: [stockSummary.available, stockSummary.lowStock, stockSummary.outOfStock], backgroundColor: [CHART.success, CHART.warning, CHART.danger] }],
+  }
+  const stockByMedData = stockTop.length > 0 && {
+    labels: stockTop.map((m) => m.description),
+    datasets: [{ label: 'Disponibles', data: stockTop.map((m) => m.available), backgroundColor: CHART.accent }],
   }
 
   return (
@@ -187,33 +190,40 @@ export default function PanelFarmacia() {
             />
           </section>
 
-          <section className="grid grid-2 mb-4">
-            <ChartCard title="Resumen de prescripciones" subtitle="Comparativa por estado">
-              <Bar data={chartData} />
+          {/* Reportería de inventario y demanda */}
+          <section className="grid grid-3 mb-4">
+            <ChartCard title="Top medicamentos recetados" subtitle="Demanda → prioridad de reposición">
+              {topData ? <Bar data={topData} options={horizontalOptions} /> : <Empty>Sin datos.</Empty>}
             </ChartCard>
-
-            <div className="card">
-              <h2 className="mt-0">Alertas de Stock</h2>
-              {stockAlerts.length === 0 ? (
-                <Empty>Sin alertas de stock.</Empty>
-              ) : (
-                stockAlerts.map((m) => {
-                  const st = stockStatus(m.status)
-                  return (
-                    <div className="list-card" key={m.id}>
-                      <div className="meta">
-                        <strong>{m.description}</strong>
-                        <small>
-                          Stock: {m.stock?.availableQuantity ?? 0} / Mínimo: {m.minStock ?? 0}
-                        </small>
-                      </div>
-                      <Badge type={st.badge}>{st.label}</Badge>
-                    </div>
-                  )
-                })
-              )}
-            </div>
+            <ChartCard title="Distribución de stock" subtitle="Salud del inventario">
+              {distribData ? <Doughnut data={distribData} options={baseOptions} /> : <Empty>Sin datos de stock.</Empty>}
+            </ChartCard>
+            <ChartCard title="Stock por medicamento" subtitle="Unidades disponibles">
+              {stockByMedData ? <Bar data={stockByMedData} options={baseOptions} /> : <Empty>Sin medicamentos.</Empty>}
+            </ChartCard>
           </section>
+
+          <div className="card mb-4">
+            <h2 className="mt-0">Alertas de Stock</h2>
+            {stockAlerts.length === 0 ? (
+              <Empty>Sin alertas de stock.</Empty>
+            ) : (
+              stockAlerts.map((m) => {
+                const st = stockStatus(m.status)
+                return (
+                  <div className="list-card" key={m.id}>
+                    <div className="meta">
+                      <strong>{m.description}</strong>
+                      <small>
+                        Stock: {m.stock?.availableQuantity ?? 0} / Mínimo: {m.minStock ?? 0}
+                      </small>
+                    </div>
+                    <Badge type={st.badge}>{st.label}</Badge>
+                  </div>
+                )
+              })
+            )}
+          </div>
 
           <div className="card">
             <h2 className="mt-0 mb-3">Cola de Prescripciones</h2>

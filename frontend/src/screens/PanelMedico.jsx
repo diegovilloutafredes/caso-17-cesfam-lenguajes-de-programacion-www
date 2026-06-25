@@ -1,14 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { dashboardsApi, analyticsApi, patientsApi, inventoryApi, prescriptionsApi } from '../api'
+import { dashboardsApi, patientsApi, inventoryApi, prescriptionsApi } from '../api'
 import Modal from '../components/Modal'
 import ActivePrescriptionsList from '../components/ActivePrescriptionsList'
-import { Doughnut, Bar, Line, ChartCard, CHART, baseOptions } from '../components/charts'
-import { Kpi, SearchBar, PageHeader, Empty, Badge } from '../components/ui'
+import { Doughnut, ChartCard, CHART, baseOptions } from '../components/charts'
+import { SearchBar, PageHeader, Empty, Badge } from '../components/ui'
 import { useToast } from '../context/ToastContext'
 import { prescriptionStatus, fullName } from '../lib/format'
-
-const TREND_FROM = '2026-04-01'
-const TREND_TO = '2026-06-30'
 
 const emptyForm = {
   patientId: '',
@@ -19,23 +16,37 @@ const emptyForm = {
   totalQuantity: '',
 }
 
+const STATE_COLORS = {
+  SUBMITTED: CHART.primary,
+  RESERVED: CHART.accent,
+  READY_FOR_PICKUP: CHART.warning,
+  PICKED_UP: CHART.success,
+  EXTERNAL_PURCHASE: CHART.info,
+  CANCELLED: CHART.danger,
+  EXPIRED: '#9CA3AF',
+}
+
+// Disponibilidad del medicamento elegido al recetar (ayuda la decisión clínica).
+function medStock(m) {
+  const a = m?.stock?.availableQuantity ?? 0
+  if (a === 0) return { label: 'Sin stock', type: 'danger' }
+  if (a < (m?.minStock ?? 0)) return { label: `Stock bajo (${a} disponibles)`, type: 'warning' }
+  return { label: `En stock (${a} disponibles)`, type: 'success' }
+}
+
 export default function PanelMedico() {
   const { showToast } = useToast()
 
   const [dashboard, setDashboard] = useState(null)
-  const [trend, setTrend] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Búsqueda de pacientes
   const [search, setSearch] = useState('')
   const [patients, setPatients] = useState([])
 
-  // Modal libreta
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState(null)
   const [historyLoading, setHistoryLoading] = useState(false)
 
-  // Modal nueva prescripción
   const [rxOpen, setRxOpen] = useState(false)
   const [medications, setMedications] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -44,12 +55,8 @@ export default function PanelMedico() {
   const loadDashboard = useCallback(async () => {
     setLoading(true)
     try {
-      const [doctor, trendData] = await Promise.all([
-        dashboardsApi.doctor(),
-        analyticsApi.trend(TREND_FROM, TREND_TO),
-      ])
+      const doctor = await dashboardsApi.doctor()
       setDashboard(doctor)
-      setTrend(trendData)
       setPatients(doctor.recentPatients || [])
     } catch (err) {
       showToast('Error al cargar el panel', err.message, 'danger')
@@ -62,7 +69,7 @@ export default function PanelMedico() {
     loadDashboard()
   }, [loadDashboard])
 
-  // Búsqueda de pacientes: vacía → recientes; con texto → consulta API.
+  // Búsqueda de pacientes: vacía → recientes; con texto → consulta API (con debounce).
   useEffect(() => {
     const term = search.trim()
     if (!term) {
@@ -155,50 +162,18 @@ export default function PanelMedico() {
     }
   }
 
-  const stock = dashboard?.stockSummary
-  const stockTop = dashboard?.stockTop || []
-  const series = trend?.series || []
-
-  const doughnutData = stock && {
-    labels: ['Disponibles', 'Stock bajo', 'Sin stock'],
+  const states = dashboard?.prescriptionStates || []
+  const stateData = states.length > 0 && {
+    labels: states.map((s) => prescriptionStatus(s.status).label),
     datasets: [
       {
-        data: [stock.available, stock.lowStock, stock.outOfStock],
-        backgroundColor: [CHART.success, CHART.warning, CHART.danger],
+        data: states.map((s) => s.count),
+        backgroundColor: states.map((s) => STATE_COLORS[s.status] || CHART.primary),
       },
     ],
   }
 
-  const barData = stockTop.length > 0 && {
-    labels: stockTop.map((m) => m.description),
-    datasets: [
-      {
-        label: 'Disponible',
-        data: stockTop.map((m) => m.available),
-        backgroundColor: CHART.primary,
-      },
-    ],
-  }
-
-  const lineData = series.length > 0 && {
-    labels: series.map((s) => s.date),
-    datasets: [
-      {
-        label: 'Emisión',
-        data: series.map((s) => s.emission),
-        borderColor: CHART.primary,
-        backgroundColor: CHART.primary,
-        tension: 0.3,
-      },
-      {
-        label: 'Entrega',
-        data: series.map((s) => s.delivery),
-        borderColor: CHART.success,
-        backgroundColor: CHART.success,
-        tension: 0.3,
-      },
-    ],
-  }
+  const selectedMed = medications.find((m) => m.id === form.medicationId)
 
   return (
     <>
@@ -216,30 +191,14 @@ export default function PanelMedico() {
 
       {!loading && (
         <>
-          {/* KPIs de stock */}
-          <section className="grid grid-3 mb-4">
-            <Kpi icon="✓" num={stock?.available ?? 0} label="Disponibles" type="success" />
-            <Kpi icon="⚠" num={stock?.lowStock ?? 0} label="Stock Bajo" type="warning" />
-            <Kpi icon="⨯" num={stock?.outOfStock ?? 0} label="Sin Stock" type="danger" />
-          </section>
-
-          {/* Reportería */}
+          {/* Reportería clínica: estado de las recetas */}
           <section className="grid grid-2 mb-4">
-            <ChartCard title="Distribución de Stock" subtitle="Estado actual del inventario">
-              {doughnutData ? <Doughnut data={doughnutData} options={baseOptions} /> : <Empty>Sin datos de stock.</Empty>}
-            </ChartCard>
-            <ChartCard title="Stock por Medicamento" subtitle="Unidades disponibles">
-              {barData ? <Bar data={barData} options={baseOptions} /> : <Empty>Sin medicamentos.</Empty>}
+            <ChartCard title="Recetas por estado" subtitle="Panorama de las recetas del sistema">
+              {stateData ? <Doughnut data={stateData} options={baseOptions} /> : <Empty>Sin recetas.</Empty>}
             </ChartCard>
           </section>
 
-          <section className="mb-4">
-            <ChartCard title="Tendencia de Prescripciones" subtitle={`${TREND_FROM} a ${TREND_TO}`}>
-              {lineData ? <Line data={lineData} options={baseOptions} /> : <Empty>Sin datos de tendencia.</Empty>}
-            </ChartCard>
-          </section>
-
-          {/* Pacientes recientes */}
+          {/* Pacientes recientes (por última receta emitida) */}
           <div className="card">
             <h2>Pacientes Recientes</h2>
             <SearchBar
@@ -404,6 +363,11 @@ export default function PanelMedico() {
                 </option>
               ))}
             </select>
+            {selectedMed && (
+              <div className="mt-2">
+                <Badge type={medStock(selectedMed).type}>{medStock(selectedMed).label}</Badge>
+              </div>
+            )}
           </div>
           <div className="input-group">
             <label>Frecuencia (horas)</label>

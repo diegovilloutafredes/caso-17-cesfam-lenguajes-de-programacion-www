@@ -41,13 +41,14 @@ def test_login(client):
 
 def test_doctor_dashboard(client, auth):
     d = client.get("/api/v1/doctor/dashboard", headers=auth).json()["data"]
-    assert {"stockSummary", "recentPatients", "stockTop"} <= d.keys()
-    assert d["stockSummary"]["totalMedications"] == 7
+    assert {"prescriptionStates", "recentPatients"} <= d.keys()
+    assert len(d["recentPatients"]) > 0  # pacientes con actividad clínica reciente
 
 
 def test_pharmacy_dashboard(client, pharmacy_auth):
     d = client.get("/api/v1/pharmacy/dashboard", headers=pharmacy_auth).json()["data"]
-    assert {"kpis", "queue", "stockAlerts"} <= d.keys()
+    assert {"kpis", "queue", "stockAlerts", "stockSummary", "stockTop", "topMedications"} <= d.keys()
+    assert d["stockSummary"]["totalMedications"] == 14
 
 
 # --- Proxy a servicios de dominio ------------------------------------------

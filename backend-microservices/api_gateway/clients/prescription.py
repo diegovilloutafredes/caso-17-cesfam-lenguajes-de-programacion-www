@@ -19,3 +19,6 @@ class PrescriptionServiceClient(ServiceClient):
             token=token,
             params={"status_filter": statuses, "limit": 100},
         )
+
+    def list_all(self, token: str, limit: int = 200) -> dict:
+        return self.get("/api/v1/prescriptions", token=token, params={"limit": limit})
