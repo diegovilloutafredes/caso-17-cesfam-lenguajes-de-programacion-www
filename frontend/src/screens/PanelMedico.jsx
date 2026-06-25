@@ -1,0 +1,459 @@
+import { useState, useEffect, useCallback } from 'react'
+import { dashboardsApi, analyticsApi, patientsApi, inventoryApi, prescriptionsApi } from '../api'
+import Modal from '../components/Modal'
+import ActivePrescriptionsList from '../components/ActivePrescriptionsList'
+import { Doughnut, Bar, Line, ChartCard, CHART, baseOptions } from '../components/charts'
+import { Kpi, SearchBar, PageHeader, Empty, Badge } from '../components/ui'
+import { useToast } from '../context/ToastContext'
+import { prescriptionStatus, fullName } from '../lib/format'
+
+const TREND_FROM = '2026-04-01'
+const TREND_TO = '2026-06-30'
+
+const emptyForm = {
+  patientId: '',
+  medicationId: '',
+  intervalHours: '8',
+  durationDays: '7',
+  treatmentType: 'SHORT',
+  totalQuantity: '',
+}
+
+export default function PanelMedico() {
+  const { showToast } = useToast()
+
+  const [dashboard, setDashboard] = useState(null)
+  const [trend, setTrend] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  // Búsqueda de pacientes
+  const [search, setSearch] = useState('')
+  const [patients, setPatients] = useState([])
+
+  // Modal libreta
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [history, setHistory] = useState(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  // Modal nueva prescripción
+  const [rxOpen, setRxOpen] = useState(false)
+  const [medications, setMedications] = useState([])
+  const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+
+  const loadDashboard = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [doctor, trendData] = await Promise.all([
+        dashboardsApi.doctor(),
+        analyticsApi.trend(TREND_FROM, TREND_TO),
+      ])
+      setDashboard(doctor)
+      setTrend(trendData)
+      setPatients(doctor.recentPatients || [])
+    } catch (err) {
+      showToast('Error al cargar el panel', err.message, 'danger')
+    } finally {
+      setLoading(false)
+    }
+  }, [showToast])
+
+  useEffect(() => {
+    loadDashboard()
+  }, [loadDashboard])
+
+  // Búsqueda de pacientes: vacía → recientes; con texto → consulta API.
+  useEffect(() => {
+    const term = search.trim()
+    if (!term) {
+      setPatients(dashboard?.recentPatients || [])
+      return
+    }
+    let cancelled = false
+    const t = setTimeout(async () => {
+      try {
+        const res = await patientsApi.list({ search: term, page: 1, limit: 10 })
+        if (!cancelled) setPatients(res.data || [])
+      } catch (err) {
+        if (!cancelled) showToast('Error en la búsqueda', err.message, 'danger')
+      }
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [search, dashboard, showToast])
+
+  async function openHistory(patientId) {
+    setHistoryOpen(true)
+    setHistory(null)
+    setHistoryLoading(true)
+    try {
+      const data = await patientsApi.history(patientId)
+      setHistory(data)
+    } catch (err) {
+      showToast('Error al cargar la libreta', err.message, 'danger')
+      setHistoryOpen(false)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  async function openPrescription() {
+    setForm(emptyForm)
+    setRxOpen(true)
+    if (medications.length === 0) {
+      try {
+        const res = await inventoryApi.listMedications({ page: 1, limit: 100 })
+        setMedications(res.data || [])
+      } catch (err) {
+        showToast('Error al cargar medicamentos', err.message, 'danger')
+      }
+    }
+  }
+
+  function setField(key, value) {
+    setForm((f) => ({ ...f, [key]: value }))
+  }
+
+  async function submitPrescription() {
+    if (!form.patientId || !form.medicationId || !form.totalQuantity) {
+      showToast('Datos incompletos', 'Selecciona paciente, medicamento y cantidad.', 'warning')
+      return
+    }
+    setSaving(true)
+    try {
+      const intervalHours = Number(form.intervalHours)
+      const durationDays = Number(form.durationDays)
+      const deadline = new Date()
+      deadline.setDate(deadline.getDate() + durationDays)
+      const pickupDeadline = deadline.toISOString().slice(0, 10)
+
+      await prescriptionsApi.create({
+        patientId: form.patientId,
+        treatmentType: form.treatmentType,
+        durationDays,
+        pickupDeadline,
+        items: [
+          {
+            medicationId: form.medicationId,
+            dosesPerInterval: 1,
+            intervalHours,
+            doseDescription: `1 dosis cada ${intervalHours}h`,
+            durationDays,
+            totalQuantity: Number(form.totalQuantity),
+          },
+        ],
+      })
+      showToast('Prescripción creada', 'Receta emitida y enviada a farmacia.', 'success')
+      setRxOpen(false)
+      loadDashboard()
+    } catch (err) {
+      showToast('Error al crear la prescripción', err.message, 'danger')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const stock = dashboard?.stockSummary
+  const stockTop = dashboard?.stockTop || []
+  const series = trend?.series || []
+
+  const doughnutData = stock && {
+    labels: ['Disponibles', 'Stock bajo', 'Sin stock'],
+    datasets: [
+      {
+        data: [stock.available, stock.lowStock, stock.outOfStock],
+        backgroundColor: [CHART.success, CHART.warning, CHART.danger],
+      },
+    ],
+  }
+
+  const barData = stockTop.length > 0 && {
+    labels: stockTop.map((m) => m.description),
+    datasets: [
+      {
+        label: 'Disponible',
+        data: stockTop.map((m) => m.available),
+        backgroundColor: CHART.primary,
+      },
+    ],
+  }
+
+  const lineData = series.length > 0 && {
+    labels: series.map((s) => s.date),
+    datasets: [
+      {
+        label: 'Emisión',
+        data: series.map((s) => s.emission),
+        borderColor: CHART.primary,
+        backgroundColor: CHART.primary,
+        tension: 0.3,
+      },
+      {
+        label: 'Entrega',
+        data: series.map((s) => s.delivery),
+        borderColor: CHART.success,
+        backgroundColor: CHART.success,
+        tension: 0.3,
+      },
+    ],
+  }
+
+  return (
+    <>
+      <PageHeader title="Panel Médico" subtitle="Gestión de pacientes y prescripciones">
+        <button className="btn btn-primary" onClick={openPrescription}>
+          ＋ Nueva Prescripción
+        </button>
+      </PageHeader>
+
+      {loading && (
+        <div className="card">
+          <Empty>Cargando panel…</Empty>
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          {/* KPIs de stock */}
+          <section className="grid grid-3 mb-4">
+            <Kpi icon="✓" num={stock?.available ?? 0} label="Disponibles" type="success" />
+            <Kpi icon="⚠" num={stock?.lowStock ?? 0} label="Stock Bajo" type="warning" />
+            <Kpi icon="⨯" num={stock?.outOfStock ?? 0} label="Sin Stock" type="danger" />
+          </section>
+
+          {/* Reportería */}
+          <section className="grid grid-2 mb-4">
+            <ChartCard title="Distribución de Stock" subtitle="Estado actual del inventario">
+              {doughnutData ? <Doughnut data={doughnutData} options={baseOptions} /> : <Empty>Sin datos de stock.</Empty>}
+            </ChartCard>
+            <ChartCard title="Stock por Medicamento" subtitle="Unidades disponibles">
+              {barData ? <Bar data={barData} options={baseOptions} /> : <Empty>Sin medicamentos.</Empty>}
+            </ChartCard>
+          </section>
+
+          <section className="mb-4">
+            <ChartCard title="Tendencia de Prescripciones" subtitle={`${TREND_FROM} a ${TREND_TO}`}>
+              {lineData ? <Line data={lineData} options={baseOptions} /> : <Empty>Sin datos de tendencia.</Empty>}
+            </ChartCard>
+          </section>
+
+          {/* Pacientes recientes */}
+          <div className="card">
+            <h2>Pacientes Recientes</h2>
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar paciente por nombre o RUT..."
+              style={{ marginBottom: 12 }}
+            />
+            {patients.length === 0 ? (
+              <Empty>No hay pacientes para mostrar.</Empty>
+            ) : (
+              patients.map((p) => (
+                <div className="list-card" key={p.id}>
+                  <div className="meta">
+                    <strong>{fullName(p)}</strong>
+                    <small>RUT: {p.rut}</small>
+                  </div>
+                  <div className="row" style={{ gap: 6 }}>
+                    <button className="btn btn-outline btn-sm" onClick={() => openHistory(p.id)}>
+                      Ver Libreta
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Modal: Libreta del paciente */}
+      <Modal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="Libreta del Paciente"
+        subtitle="Carnet, recetas activas e historial completo de medicamentos."
+        large
+        actions={
+          <button className="btn btn-outline" onClick={() => setHistoryOpen(false)}>
+            Cerrar
+          </button>
+        }
+      >
+        {historyLoading && <Empty>Cargando libreta…</Empty>}
+        {!historyLoading && history && (
+          <>
+            <div className="grid grid-2">
+              <div className="input-group">
+                <label>Nombre completo</label>
+                <input className="input" type="text" value={fullName(history.patient)} readOnly />
+              </div>
+              <div className="input-group">
+                <label>RUT</label>
+                <input className="input" type="text" value={history.patient?.rut || ''} readOnly />
+              </div>
+              <div className="input-group">
+                <label>Fecha de nacimiento</label>
+                <input className="input" type="text" value={history.patient?.birthDate || ''} readOnly />
+              </div>
+              <div className="input-group">
+                <label>Carnet de Paciente</label>
+                <input
+                  className="input"
+                  type="text"
+                  value={history.patient?.patientCard?.number || ''}
+                  readOnly
+                />
+              </div>
+            </div>
+
+            <ActivePrescriptionsList
+              prescriptions={history.activePrescriptions}
+              renderMeta={(rx) =>
+                `${rx.items?.[0]?.doseDescription || '—'} · Retiro hasta ${rx.pickupDeadline}`
+              }
+            />
+
+            <div className="modal-section">
+              <h3>Historial completo</h3>
+              {(history.fullHistory || []).length === 0 ? (
+                <Empty>Sin historial.</Empty>
+              ) : (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Fecha emisión</th>
+                      <th>Dosis</th>
+                      <th>Duración</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.fullHistory.map((rx) => {
+                      const st = prescriptionStatus(rx.status)
+                      const item = rx.items?.[0]
+                      return (
+                        <tr key={rx.id}>
+                          <td>
+                            <strong>{rx.id}</strong>
+                          </td>
+                          <td>{rx.emissionDate}</td>
+                          <td>{item?.doseDescription || '—'}</td>
+                          <td>{rx.durationDays} días</td>
+                          <td>
+                            <Badge type={st.badge}>{st.label}</Badge>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+      </Modal>
+
+      {/* Modal: Nueva prescripción */}
+      <Modal
+        open={rxOpen}
+        onClose={() => setRxOpen(false)}
+        title="Nueva Prescripción"
+        subtitle="Complete los datos para emitir la receta del paciente."
+        actions={
+          <>
+            <button className="btn btn-outline" onClick={() => setRxOpen(false)} disabled={saving}>
+              Cancelar
+            </button>
+            <button className="btn btn-primary" onClick={submitPrescription} disabled={saving}>
+              {saving ? 'Creando…' : 'Crear Prescripción'}
+            </button>
+          </>
+        }
+      >
+        <div className="grid grid-2">
+          <div className="input-group">
+            <label>Paciente</label>
+            <select
+              className="select"
+              value={form.patientId}
+              onChange={(e) => setField('patientId', e.target.value)}
+            >
+              <option value="">Seleccionar paciente</option>
+              {patients.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {fullName(p)} — {p.rut}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="input-group">
+            <label>Medicamento</label>
+            <select
+              className="select"
+              value={form.medicationId}
+              onChange={(e) => setField('medicationId', e.target.value)}
+            >
+              <option value="">Seleccionar medicamento</option>
+              {medications.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.description}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="input-group">
+            <label>Frecuencia (horas)</label>
+            <select
+              className="select"
+              value={form.intervalHours}
+              onChange={(e) => setField('intervalHours', e.target.value)}
+            >
+              <option value="6">Cada 6 h</option>
+              <option value="8">Cada 8 h</option>
+              <option value="12">Cada 12 h</option>
+              <option value="24">Cada 24 h</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <label>Duración (días)</label>
+            <select
+              className="select"
+              value={form.durationDays}
+              onChange={(e) => setField('durationDays', e.target.value)}
+            >
+              <option value="7">7 días</option>
+              <option value="10">10 días</option>
+              <option value="30">30 días</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <label>Tipo de Tratamiento</label>
+            <select
+              className="select"
+              value={form.treatmentType}
+              onChange={(e) => setField('treatmentType', e.target.value)}
+            >
+              <option value="SHORT">Corto</option>
+              <option value="LONG">Largo</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <label>Cantidad</label>
+            <input
+              className="input"
+              type="number"
+              min="1"
+              placeholder="Ej: 20"
+              value={form.totalQuantity}
+              onChange={(e) => setField('totalQuantity', e.target.value)}
+            />
+          </div>
+        </div>
+      </Modal>
+    </>
+  )
+}

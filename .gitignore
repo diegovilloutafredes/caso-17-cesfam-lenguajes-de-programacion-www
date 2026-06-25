@@ -8,3 +8,11 @@ pgdata/
 *.sqlite3
 .pytest_cache/
 .DS_Store
+
+# Frontend (React + Vite)
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Vercel
+.vercel/
