@@ -4,9 +4,6 @@ Arquitectura desplegada: **backend de microservicios** (`backend-microservices/`
 y **frontend** React/Vite (`frontend/`) en **Vercel**. Persistencia PostgreSQL con
 **una base por servicio**. Todo dev/staging; nada en producción.
 
-> El monolito (`backend/` + `render.yaml`) se conserva como alternativa de referencia;
-> esta guía cubre el despliegue activo de microservicios.
-
 ## Forma del despliegue
 
 En Railway todo el backend corre como **un solo servicio** que levanta los **7 procesos
