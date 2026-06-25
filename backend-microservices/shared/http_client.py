@@ -24,18 +24,12 @@ class CircuitBreakerOpen(Exception):
 
 
 class CircuitBreaker:
-    """Circuit breaker con tres estados: CLOSED, OPEN, HALF_OPEN.
+    """Circuit breaker con tres estados:
 
-    - **CLOSED**: las llamadas pasan al servicio. Se cuentan fallos consecutivos.
-    - **OPEN**: tras `failure_threshold` fallos, todas las llamadas fallan
-      inmediatamente con `CircuitBreakerOpen`. Tras `reset_timeout` segundos,
-      transición a HALF_OPEN.
-    - **HALF_OPEN**: una llamada de prueba. Si éxito → CLOSED y se resetea
-      el contador. Si falla → OPEN nuevamente.
-
-    Demo: si matas un container, los breakers de sus clientes se abren tras
-    `failure_threshold` requests, fallan rápido los siguientes, y prueban
-    recuperación cada `reset_timeout` segundos.
+    - CLOSED: las llamadas pasan; se cuentan fallos consecutivos.
+    - OPEN: tras `failure_threshold` fallos, falla rápido con `CircuitBreakerOpen`;
+      pasa a HALF_OPEN al cumplirse `reset_timeout`.
+    - HALF_OPEN: una llamada de prueba; éxito → CLOSED, fallo → OPEN.
     """
 
     def __init__(

@@ -2,12 +2,30 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from inventory_service.seed import STATE
+from inventory_service.db import get_session
+from inventory_service.models import WriteOff
 from shared.auth import current_user
 from shared.envelope import ok
 
 router = APIRouter(prefix="/api/v1/write-offs", tags=["Bajas"])
+
+
+def _serialize_write_off(w: WriteOff) -> dict:
+    return {
+        "id": w.id,
+        "batchId": w.batchId,
+        "medicationId": w.medicationId,
+        "staffId": w.staffId,
+        "reason": w.reason,
+        "quantity": w.quantity,
+        "status": w.status,
+        "expiredAt": w.expiredAt,
+        "discardDate": w.discardDate,
+        "notes": w.notes,
+    }
 
 
 @router.get("")
@@ -19,9 +37,10 @@ def list_write_offs(
     dateTo: Optional[date] = None,
     page: int = 1,
     limit: int = 20,
+    db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    items = list(STATE["writeOffs"].values())
+    items = [_serialize_write_off(w) for w in db.execute(select(WriteOff)).scalars().all()]
     if medicationId:
         items = [w for w in items if w["medicationId"] == medicationId]
     if batchId:
@@ -46,8 +65,12 @@ def list_write_offs(
 
 
 @router.get("/{write_off_id}")
-def get_write_off(write_off_id: str, _: dict = Depends(current_user)):
-    w = STATE["writeOffs"].get(write_off_id)
+def get_write_off(
+    write_off_id: str,
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
+    w = db.get(WriteOff, write_off_id)
     if not w:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Baja no encontrada"})
-    return ok(w)
+    return ok(_serialize_write_off(w))

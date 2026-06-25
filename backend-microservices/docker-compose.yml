@@ -1,16 +1,38 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: cesfam_pg
+    environment:
+      POSTGRES_USER: cesfam
+      POSTGRES_PASSWORD: cesfam
+      POSTGRES_DB: cesfam
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cesfam"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   identity_service:
     build: .
     container_name: cesfam_identity
     ports:
       - "8001:8001"
     command: uvicorn identity_service.main:app --host 0.0.0.0 --port 8001
+    environment:
+      DATABASE_URL: postgresql+psycopg2://cesfam:cesfam@postgres:5432/identity_db
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 8s
 
   patient_service:
     build: .
@@ -19,16 +41,17 @@ services:
       - "8002:8002"
     command: uvicorn patient_service.main:app --host 0.0.0.0 --port 8002
     environment:
+      DATABASE_URL: postgresql+psycopg2://cesfam:cesfam@postgres:5432/patient_db
       PRESCRIPTION_SERVICE_URL: http://prescription_service:8004
-    # nota: NO usamos depends_on prescription_service para evitar ciclo de startup
-    # (prescription_service ya depende de patient_service). La llamada cross-service
-    # se hace en runtime con retry + CB que tolera arrancos parciales.
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 8s
 
   inventory_service:
     build: .
@@ -36,12 +59,17 @@ services:
     ports:
       - "8003:8003"
     command: uvicorn inventory_service.main:app --host 0.0.0.0 --port 8003
+    environment:
+      DATABASE_URL: postgresql+psycopg2://cesfam:cesfam@postgres:5432/inventory_db
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 8s
 
   notification_service:
     build: .
@@ -49,12 +77,17 @@ services:
     ports:
       - "8005:8005"
     command: uvicorn notification_service.main:app --host 0.0.0.0 --port 8005
+    environment:
+      DATABASE_URL: postgresql+psycopg2://cesfam:cesfam@postgres:5432/notification_db
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 8s
 
   prescription_service:
     build: .
@@ -63,10 +96,13 @@ services:
       - "8004:8004"
     command: uvicorn prescription_service.main:app --host 0.0.0.0 --port 8004
     environment:
+      DATABASE_URL: postgresql+psycopg2://cesfam:cesfam@postgres:5432/prescription_db
       PATIENT_SERVICE_URL: http://patient_service:8002
       INVENTORY_SERVICE_URL: http://inventory_service:8003
       NOTIFICATION_SERVICE_URL: http://notification_service:8005
     depends_on:
+      postgres:
+        condition: service_healthy
       patient_service:
         condition: service_healthy
       inventory_service:
@@ -78,7 +114,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 8s
 
   report_service:
     build: .
@@ -99,7 +135,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 8s
 
   api_gateway:
     build: .
@@ -112,6 +148,8 @@ services:
       PATIENT_SERVICE_URL: http://patient_service:8002
       INVENTORY_SERVICE_URL: http://inventory_service:8003
       PRESCRIPTION_SERVICE_URL: http://prescription_service:8004
+      NOTIFICATION_SERVICE_URL: http://notification_service:8005
+      REPORT_SERVICE_URL: http://report_service:8006
     depends_on:
       identity_service:
         condition: service_healthy

@@ -1,9 +1,12 @@
 """Seed local de IdentityService. Solo conoce sus propios users."""
 
-from typing import Dict
+from sqlalchemy import select
 
-USERS: Dict[str, dict] = {
-    "USR-001": {
+from identity_service.db import SessionLocal
+from identity_service.models import User
+
+USERS = [
+    {
         "id": "USR-001",
         "username": "drperez",
         "rut": "11.111.111-1",
@@ -11,7 +14,7 @@ USERS: Dict[str, dict] = {
         "email": "juan.perez@cesfam.cl",
         "role": "doctor",
     },
-    "USR-002": {
+    {
         "id": "USR-002",
         "username": "mgonzalez",
         "rut": "22.222.222-2",
@@ -19,7 +22,7 @@ USERS: Dict[str, dict] = {
         "email": "maria.gonzalez@cesfam.cl",
         "role": "pharmacy_staff",
     },
-    "USR-003": {
+    {
         "id": "USR-003",
         "username": "dralopez",
         "rut": "13.555.444-3",
@@ -27,4 +30,17 @@ USERS: Dict[str, dict] = {
         "email": "ana.lopez@cesfam.cl",
         "role": "doctor",
     },
-}
+]
+
+
+def seed() -> None:
+    """Inserta los usuarios del seed solo si la tabla está vacía (idempotente)."""
+    db = SessionLocal()
+    try:
+        if db.execute(select(User.id).limit(1)).first() is not None:
+            return
+        for u in USERS:
+            db.add(User(**u))
+        db.commit()
+    finally:
+        db.close()

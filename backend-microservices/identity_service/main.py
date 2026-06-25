@@ -1,11 +1,23 @@
 """IdentityService — autenticación de usuarios del sistema CESFAM."""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
+from identity_service.db import init_db
 from identity_service.routers import auth
+from identity_service.seed import seed
 from shared.errors import register_envelope_handler
 
-app = FastAPI(title="IdentityService", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    seed()
+    yield
+
+
+app = FastAPI(title="IdentityService", version="1.0.0", lifespan=lifespan)
 register_envelope_handler(app)
 
 app.include_router(auth.router)

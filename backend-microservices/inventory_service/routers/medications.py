@@ -2,22 +2,57 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from inventory_service.db import get_session
+from inventory_service.models import Batch, Medication
 from inventory_service.schemas import (
     BatchCreate, ConsumeRequest, StockReleaseRequest, StockReserveRequest,
 )
-from inventory_service.seed import STATE, next_id
+from inventory_service.seed import next_id
 from shared.auth import current_user
 from shared.envelope import created, ok
 
 router = APIRouter(prefix="/api/v1/medications", tags=["Medicamentos"])
 
 
-def _stock_status(med: dict) -> str:
-    available = med["stock"]["availableQuantity"]
+def _serialize_med(med: Medication) -> dict:
+    return {
+        "id": med.id,
+        "code": med.code,
+        "description": med.description,
+        "manufacturer": med.manufacturer,
+        "type": med.type,
+        "components": med.components,
+        "content": med.content,
+        "packaging": med.packaging,
+        "minStock": med.minStock,
+        "stock": {
+            "availableQuantity": med.availableQuantity,
+            "reservedQuantity": med.reservedQuantity,
+            "physicalQuantity": med.physicalQuantity,
+        },
+    }
+
+
+def _serialize_batch(batch: Batch) -> dict:
+    return {
+        "id": batch.id,
+        "medicationId": batch.medicationId,
+        "batchNumber": batch.batchNumber,
+        "arrivalDate": batch.arrivalDate,
+        "expirationDate": batch.expirationDate,
+        "initialQuantity": batch.initialQuantity,
+        "availableQuantity": batch.availableQuantity,
+    }
+
+
+def _stock_status(med: Medication) -> str:
+    available = med.availableQuantity
     if available == 0:
         return "OUT_OF_STOCK"
-    if available < med["minStock"]:
+    if available < med.minStock:
         return "LOW_STOCK"
     return "AVAILABLE"
 
@@ -27,9 +62,11 @@ def list_medications(
     search: Optional[str] = None,
     page: int = 1,
     limit: int = 20,
+    db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    items = list(STATE["medications"].values())
+    meds = db.execute(select(Medication)).scalars().all()
+    items = [_serialize_med(m) for m in meds]
     if search:
         q = search.lower()
         items = [m for m in items
@@ -48,9 +85,13 @@ def list_medications(
 
 
 @router.get("/stock-summary")
-def stock_summary(_: dict = Depends(current_user)):
+def stock_summary(
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
+    meds = db.execute(select(Medication)).scalars().all()
     available = low = out = 0
-    for m in STATE["medications"].values():
+    for m in meds:
         s = _stock_status(m)
         if s == "AVAILABLE":
             available += 1
@@ -60,103 +101,159 @@ def stock_summary(_: dict = Depends(current_user)):
             out += 1
     return ok({
         "available": available, "lowStock": low,
-        "outOfStock": out, "totalMedications": len(STATE["medications"]),
+        "outOfStock": out, "totalMedications": len(meds),
     })
 
 
 @router.get("/low-stock")
-def low_stock(_: dict = Depends(current_user)):
+def low_stock(
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
+    meds = db.execute(select(Medication)).scalars().all()
     return ok([
-        {**m, "status": _stock_status(m)}
-        for m in STATE["medications"].values()
+        {**_serialize_med(m), "status": _stock_status(m)}
+        for m in meds
         if _stock_status(m) != "AVAILABLE"
     ])
 
 
 @router.get("/{medication_id}")
-def get_medication(medication_id: str, _: dict = Depends(current_user)):
-    m = STATE["medications"].get(medication_id)
+def get_medication(
+    medication_id: str,
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
+    m = db.get(Medication, medication_id)
     if not m:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Medicamento no encontrado"})
-    batches = [b for b in STATE["batches"].values() if b["medicationId"] == medication_id]
-    return ok({**m, "batches": batches})
+    batches = db.execute(
+        select(Batch).where(Batch.medicationId == medication_id)
+    ).scalars().all()
+    return ok({**_serialize_med(m), "batches": [_serialize_batch(b) for b in batches]})
 
 
 @router.get("/{medication_id}/batches")
-def list_batches(medication_id: str, _: dict = Depends(current_user)):
-    if medication_id not in STATE["medications"]:
+def list_batches(
+    medication_id: str,
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
+    if not db.get(Medication, medication_id):
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Medicamento no encontrado"})
-    return ok([b for b in STATE["batches"].values() if b["medicationId"] == medication_id])
+    batches = db.execute(
+        select(Batch).where(Batch.medicationId == medication_id)
+    ).scalars().all()
+    return ok([_serialize_batch(b) for b in batches])
 
 
 @router.post("/{medication_id}/batches", status_code=status.HTTP_201_CREATED)
-def add_batch(medication_id: str, body: BatchCreate, _: dict = Depends(current_user)):
-    med = STATE["medications"].get(medication_id)
+def add_batch(
+    medication_id: str,
+    body: BatchCreate,
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
+    med = db.execute(
+        select(Medication).where(Medication.id == medication_id).with_for_update()
+    ).scalar_one_or_none()
     if not med:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Medicamento no encontrado"})
-    new_id = next_id("BCH")
-    rec = {
-        "id": new_id, "medicationId": medication_id,
-        "arrivalDate": date.today().isoformat(),
-        "availableQuantity": body.initialQuantity,
-        **body.model_dump(mode="json"),
-    }
-    STATE["batches"][new_id] = rec
-    med["stock"]["availableQuantity"] += body.initialQuantity
-    med["stock"]["physicalQuantity"] += body.initialQuantity
-    return created(rec)
+    new_id = next_id(db, "BCH")
+    batch = Batch(
+        id=new_id,
+        medicationId=medication_id,
+        batchNumber=body.batchNumber,
+        arrivalDate=date.today(),
+        expirationDate=body.expirationDate,
+        initialQuantity=body.initialQuantity,
+        availableQuantity=body.initialQuantity,
+    )
+    db.add(batch)
+    med.availableQuantity += body.initialQuantity
+    med.physicalQuantity += body.initialQuantity
+    db.commit()
+    return created(_serialize_batch(batch))
 
 
 # --- Inter-service operations ---
 
 @router.post("/{medication_id}/reserve")
-def reserve_stock(medication_id: str, body: StockReserveRequest, _: dict = Depends(current_user)):
+def reserve_stock(
+    medication_id: str,
+    body: StockReserveRequest,
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
     """Mueve `quantity` de available → reserved. Llamado por PrescriptionService."""
-    med = STATE["medications"].get(medication_id)
+    med = db.execute(
+        select(Medication).where(Medication.id == medication_id).with_for_update()
+    ).scalar_one_or_none()
     if not med:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Medicamento no encontrado"})
-    if med["stock"]["availableQuantity"] < body.quantity:
+    if med.availableQuantity < body.quantity:
         raise HTTPException(409, detail={
             "code": "INSUFFICIENT_STOCK",
-            "message": f"Stock disponible ({med['stock']['availableQuantity']}) menor a solicitado ({body.quantity})",
+            "message": f"Stock disponible ({med.availableQuantity}) menor a solicitado ({body.quantity})",
         })
-    med["stock"]["availableQuantity"] -= body.quantity
-    med["stock"]["reservedQuantity"] += body.quantity
+    med.availableQuantity -= body.quantity
+    med.reservedQuantity += body.quantity
+    db.commit()
     return ok({"medicationId": medication_id, "reservedQuantity": body.quantity})
 
 
 @router.post("/{medication_id}/release")
-def release_stock(medication_id: str, body: StockReleaseRequest, _: dict = Depends(current_user)):
+def release_stock(
+    medication_id: str,
+    body: StockReleaseRequest,
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
     """Mueve `quantity` de reserved → available. Llamado por PrescriptionService al cancelar."""
-    med = STATE["medications"].get(medication_id)
+    med = db.execute(
+        select(Medication).where(Medication.id == medication_id).with_for_update()
+    ).scalar_one_or_none()
     if not med:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Medicamento no encontrado"})
-    qty = min(body.quantity, med["stock"]["reservedQuantity"])
-    med["stock"]["reservedQuantity"] -= qty
-    med["stock"]["availableQuantity"] += qty
+    qty = min(body.quantity, med.reservedQuantity)
+    med.reservedQuantity -= qty
+    med.availableQuantity += qty
+    db.commit()
     return ok({"medicationId": medication_id, "releasedQuantity": qty})
 
 
 @router.post("/consume")
-def consume_physical(body: ConsumeRequest, _: dict = Depends(current_user)):
+def consume_physical(
+    body: ConsumeRequest,
+    db: Session = Depends(get_session),
+    _: dict = Depends(current_user),
+):
     """Decrementa physicalQuantity por asignaciones de batch. Llamado al entregar.
 
     **Atómico**: valida TODAS las partidas antes de mutar nada. Si alguna no existe,
     falla sin haber tocado ningún contador — previene corrupción parcial de stock.
     """
     # Fase 1: validación previa, ningún side-effect aún
+    batches: dict[str, Batch] = {}
     for alloc in body.allocations:
-        if alloc.batchId not in STATE["batches"]:
+        batch = db.execute(
+            select(Batch).where(Batch.id == alloc.batchId).with_for_update()
+        ).scalar_one_or_none()
+        if batch is None:
             raise HTTPException(404, detail={
                 "code": "BATCH_NOT_FOUND",
                 "message": f"Partida no encontrada: {alloc.batchId}",
             })
+        batches[alloc.batchId] = batch
     # Fase 2: mutación — ya tenemos garantía de que todas las partidas existen
     for alloc in body.allocations:
-        batch = STATE["batches"][alloc.batchId]
-        med = STATE["medications"].get(batch["medicationId"])
+        batch = batches[alloc.batchId]
+        med = db.execute(
+            select(Medication).where(Medication.id == batch.medicationId).with_for_update()
+        ).scalar_one_or_none()
         if med:
-            med["stock"]["physicalQuantity"] -= alloc.quantity
-            med["stock"]["reservedQuantity"] = max(0, med["stock"]["reservedQuantity"] - alloc.quantity)
-        batch["availableQuantity"] = max(0, batch["availableQuantity"] - alloc.quantity)
+            med.physicalQuantity -= alloc.quantity
+            med.reservedQuantity = max(0, med.reservedQuantity - alloc.quantity)
+        batch.availableQuantity = max(0, batch.availableQuantity - alloc.quantity)
+    db.commit()
     return ok({"consumed": len(body.allocations)})

@@ -2,13 +2,14 @@
 
 from fastapi import FastAPI
 
-from report_service.routers import reports
+from report_service.routers import analytics, reports
 from shared.errors import register_envelope_handler
 
 app = FastAPI(title="ReportService", version="1.0.0")
 register_envelope_handler(app)
 
 app.include_router(reports.router)
+app.include_router(analytics.router)
 
 
 @app.get("/health", include_in_schema=False)

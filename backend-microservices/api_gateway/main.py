@@ -10,16 +10,33 @@ frontend va directo a los servicios correspondientes. El gateway solo agrega
 cuando vale la pena (= reducir N round-trips a 1).
 """
 
-from fastapi import FastAPI
+import os
 
-from api_gateway.routers import auth, dashboards
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from api_gateway.routers import auth, dashboards, proxy
 from shared.errors import register_envelope_handler
 
 app = FastAPI(title="ApiGateway (BFF)", version="1.0.0")
 register_envelope_handler(app)
 
+# CORS en el BFF (única entrada del frontend). Auth Bearer en header (sin cookies),
+# por eso allow_credentials=False y se acepta el wildcard.
+_cors = os.getenv("CORS_ORIGINS", "*").strip()
+_origins = ["*"] if _cors == "*" else [o.strip() for o in _cors.split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(auth.router)
 app.include_router(dashboards.router)
+# El proxy catch-all va al final: las rutas específicas (login, dashboards) ganan.
+app.include_router(proxy.router)
 
 
 @app.get("/health", include_in_schema=False)
