@@ -1,9 +1,9 @@
 """Seed local de PrescriptionService. Solo conoce recetas.
 Referencias a USR-* y PAT-* y MED-* son IDs externos (live en otros servicios).
 
-Los aportes a reserved (recetas RESERVED/READY_FOR_PICKUP) calzan con el reservedQuantity
-del seed de InventoryService: MED-0001=21, MED-0004=14, MED-0005=60, MED-0007=30,
-MED-0008=120, MED-0009=30, MED-0011=30.
+Las recetas READY_FOR_PICKUP retienen stock reservado en InventoryService (MED-0001=21,
+MED-0004=14, MED-0008=120, MED-0009=30). Las RESERVED no reservan stock: la reserva real
+ocurre al pasar a READY (mark-available).
 """
 
 from datetime import date

@@ -192,7 +192,7 @@ export default function PanelMedico() {
       {!loading && (
         <>
           {/* Reportería clínica: estado de las recetas */}
-          <section className="grid grid-2 mb-4">
+          <section className="mb-4">
             <ChartCard title="Recetas por estado" subtitle="Panorama de las recetas del sistema">
               {stateData ? <Doughnut data={stateData} options={baseOptions} /> : <Empty>Sin recetas.</Empty>}
             </ChartCard>

@@ -9,9 +9,8 @@ from inventory_service.db import SessionLocal
 from inventory_service.models import Batch, Medication, WriteOff
 
 # Invariante por medicamento: physicalQuantity = availableQuantity + reservedQuantity,
-# y physicalQuantity = Σ batch.availableQuantity (el available del medicamento descuenta el
-# reservado; el de la partida rastrea el físico). Los reservedQuantity de abajo calzan con la
-# suma de items de recetas RESERVED/READY del seed de PrescriptionService.
+# y physicalQuantity = Σ batch.availableQuantity. El reservedQuantity calza con los items de
+# recetas READY_FOR_PICKUP (las RESERVED no retienen stock: la reserva ocurre al pasar a READY).
 _MEDICATIONS = [
     {
         "id": "MED-0001", "code": "MED-0001", "description": "Paracetamol 500mg",
@@ -51,7 +50,7 @@ _MEDICATIONS = [
         "components": "Enalapril maleato",
         "content": "10 mg por comprimido", "packaging": "Caja x 30 comprimidos",
         "minStock": 100,
-        "availableQuantity": 180, "reservedQuantity": 60, "physicalQuantity": 240,
+        "availableQuantity": 240, "reservedQuantity": 0, "physicalQuantity": 240,
     },
     {
         "id": "MED-0006", "code": "MED-0006", "description": "Aspirina 500mg",
@@ -67,7 +66,7 @@ _MEDICATIONS = [
         "components": "Losartán potásico",
         "content": "50 mg por comprimido", "packaging": "Caja x 30 comprimidos",
         "minStock": 150,
-        "availableQuantity": 320, "reservedQuantity": 30, "physicalQuantity": 350,
+        "availableQuantity": 350, "reservedQuantity": 0, "physicalQuantity": 350,
     },
     {
         "id": "MED-0008", "code": "MED-0008", "description": "Metformina 850mg",
@@ -99,7 +98,7 @@ _MEDICATIONS = [
         "components": "Levotiroxina sódica",
         "content": "100 mcg por comprimido", "packaging": "Caja x 30 comprimidos",
         "minStock": 100,
-        "availableQuantity": 170, "reservedQuantity": 30, "physicalQuantity": 200,
+        "availableQuantity": 200, "reservedQuantity": 0, "physicalQuantity": 200,
     },
     {
         "id": "MED-0012", "code": "MED-0012", "description": "Hidroclorotiazida 25mg",

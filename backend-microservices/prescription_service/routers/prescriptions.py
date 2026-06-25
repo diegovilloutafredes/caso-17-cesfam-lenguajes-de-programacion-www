@@ -378,6 +378,15 @@ def deliver(
             "message": "thirdPartyRut y thirdPartyName requeridos",
         })
 
+    # Las partidas entregadas deben sumar lo recetado (entrega completa, no parcial).
+    required = sum(it.totalQuantity for it in r.items)
+    provided = sum(b.quantity for b in body.batches)
+    if provided != required:
+        raise HTTPException(400, detail={
+            "code": "QUANTITY_MISMATCH",
+            "message": f"Las partidas ({provided}) no calzan con lo recetado ({required})",
+        })
+
     response = inventory_client.consume(
         [b.model_dump() for b in body.batches], token=token,
     )

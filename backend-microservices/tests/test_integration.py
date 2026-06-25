@@ -136,6 +136,49 @@ def test_reserve_insufficient_stock_direct(client, auth):
     assert err["code"] == "INSUFFICIENT_STOCK"
 
 
+# --- Invariantes de inventario ----------------------------------------------
+
+def test_reserved_matches_ready_prescriptions(client, auth):
+    """reservedQuantity de cada medicamento = Σ items de recetas READY_FOR_PICKUP.
+    Las RESERVED no retienen stock: la reserva ocurre al pasar a READY."""
+    ready = client.get(
+        "/api/v1/prescriptions?status_filter=READY_FOR_PICKUP&limit=200", headers=auth,
+    ).json()["data"]["data"]
+    expected: dict = {}
+    for rx in ready:
+        for it in rx["items"]:
+            expected[it["medicationId"]] = expected.get(it["medicationId"], 0) + it["totalQuantity"]
+    meds = client.get("/api/v1/medications?limit=50", headers=auth).json()["data"]["data"]
+    for m in meds:
+        assert m["stock"]["reservedQuantity"] == expected.get(m["id"], 0), m["id"]
+
+
+def test_write_off_preserves_invariant(client, auth):
+    """Una baja retira físico: mantiene physical = available + reserved."""
+    before = _stock(client, auth, "MED-0007")
+    r = client.post(
+        "/api/v1/batches/BCH-006/write-off", headers=auth,
+        json={"reason": "DAMAGED", "quantity": 5, "discard": False, "notes": "prueba"},
+    )
+    assert r.status_code == 200
+    after = _stock(client, auth, "MED-0007")
+    assert after["physicalQuantity"] == before["physicalQuantity"] - 5
+    assert after["availableQuantity"] == before["availableQuantity"] - 5
+    assert after["physicalQuantity"] == after["availableQuantity"] + after["reservedQuantity"]
+
+
+def test_deliver_requires_full_quantity(client, auth):
+    """deliver exige que las partidas sumen lo recetado (entrega completa, no parcial)."""
+    rid = _create(client, auth, [_item("MED-0001", 10)]).json()["data"]["id"]
+    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=auth)  # READY, reserva 10
+    err = client.post(
+        f"/api/v1/prescriptions/{rid}/deliver", headers=auth,
+        json={"pickerType": "patient", "batches": [{"batchId": "BCH-001", "quantity": 7}]},
+    ).json()["error"]
+    assert err["code"] == "QUANTITY_MISMATCH"
+    client.post(f"/api/v1/prescriptions/{rid}/cancel", headers=auth, json={"reason": "limpieza"})
+
+
 # --- Reportería C8 ----------------------------------------------------------
 
 def test_prescription_trend(client, auth):

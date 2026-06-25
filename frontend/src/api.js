@@ -85,13 +85,6 @@ export const dashboardsApi = {
   pharmacy: () => api.get('/api/v1/pharmacy/dashboard'),
 }
 
-export const analyticsApi = {
-  trend: (dateFrom, dateTo, eventType) =>
-    api.get('/api/v1/analytics/prescription-trend', {
-      params: { dateFrom, dateTo, ...(eventType ? { eventType } : {}) },
-    }),
-}
-
 // Reportes devuelven CSV (texto plano), no envelope.
 export const reportsApi = {
   generate: (reportType, dateFrom, dateTo) =>

@@ -96,13 +96,20 @@ export default function Recetas() {
     setPickup(r)
     setForm(EMPTY_PICKUP)
     setBatches([])
-    const medId = r.items?.[0]?.medicationId
-    if (medId == null) return
+    const item = r.items?.[0]
+    if (item?.medicationId == null) return
+    const required = r.items.reduce((acc, it) => acc + (it.totalQuantity || 0), 0)
     try {
-      const med = await inventoryApi.getMedication(medId)
+      const med = await inventoryApi.getMedication(item.medicationId)
       const list = (med.batches || []).filter((b) => (b.availableQuantity || 0) > 0)
       setBatches(list)
-      if (list.length) setForm((f) => ({ ...f, batchId: String(list[0].id) }))
+      // La entrega es completa: prellena la cantidad recetada y un lote con stock suficiente.
+      const batch = list.find((b) => b.availableQuantity >= required) || list[0]
+      setForm((f) => ({
+        ...f,
+        quantity: String(required),
+        batchId: batch ? String(batch.id) : '',
+      }))
     } catch (err) {
       showToast('Error al cargar partidas', err.message, 'danger')
     }

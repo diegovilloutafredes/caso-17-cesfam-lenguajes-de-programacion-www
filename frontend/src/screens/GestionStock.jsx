@@ -395,7 +395,7 @@ export default function GestionStock() {
         open={!!writeOffBatch}
         onClose={() => setWriteOffBatch(null)}
         title="Dar de baja medicamento"
-        subtitle="Descontar del stock disponible. Si se desecha, también del stock físico."
+        subtitle="Retira del stock las unidades dañadas o vencidas de la partida."
         actions={
           <>
             <button className="btn btn-outline" onClick={() => setWriteOffBatch(null)}>Cancelar</button>
@@ -438,7 +438,7 @@ export default function GestionStock() {
             checked={writeOffForm.discard}
             onChange={(e) => setWriteOffForm({ ...writeOffForm, discard: e.target.checked })}
           />
-          <label htmlFor="desechar" style={{ margin: 0 }}>Desechar físicamente (auditoría)</label>
+          <label htmlFor="desechar" style={{ margin: 0 }}>Registrar descarte físico (auditoría)</label>
         </div>
         <div className="input-group mt-3">
           <label>Observaciones</label>

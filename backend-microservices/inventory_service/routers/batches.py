@@ -48,11 +48,17 @@ def write_off(
     med = db.execute(
         select(Medication).where(Medication.id == batch.medicationId).with_for_update()
     ).scalar_one_or_none()
+    if med and body.quantity > med.availableQuantity:
+        raise HTTPException(409, detail={
+            "code": "INSUFFICIENT_STOCK",
+            "message": f"La baja ({body.quantity}) excede el disponible ({med.availableQuantity})",
+        })
+    # La baja retira físico (vencido/dañado): descuenta disponible y físico. `discard` solo
+    # distingue el registro de auditoría (DISCARDED vs DEDUCTED_FROM_AVAILABLE).
     batch.availableQuantity -= body.quantity
     if med:
         med.availableQuantity -= body.quantity
-        if body.discard:
-            med.physicalQuantity -= body.quantity
+        med.physicalQuantity -= body.quantity
 
     today = date.today()
     wof_id = next_id(db, "WOF")

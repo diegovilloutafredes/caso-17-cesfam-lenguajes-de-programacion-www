@@ -244,6 +244,11 @@ def consume_physical(
                 "code": "BATCH_NOT_FOUND",
                 "message": f"Partida no encontrada: {alloc.batchId}",
             })
+        if alloc.quantity > batch.availableQuantity:
+            raise HTTPException(409, detail={
+                "code": "INSUFFICIENT_BATCH",
+                "message": f"Partida {alloc.batchId}: {alloc.quantity} excede disponible ({batch.availableQuantity})",
+            })
         batches[alloc.batchId] = batch
     # Fase 2: mutación — ya tenemos garantía de que todas las partidas existen
     for alloc in body.allocations:

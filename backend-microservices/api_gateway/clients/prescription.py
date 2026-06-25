@@ -20,5 +20,15 @@ class PrescriptionServiceClient(ServiceClient):
             params={"status_filter": statuses, "limit": 100},
         )
 
-    def list_all(self, token: str, limit: int = 200) -> dict:
-        return self.get("/api/v1/prescriptions", token=token, params={"limit": limit})
+    def list_all(self, token: str, page_size: int = 200) -> dict:
+        """Trae todas las recetas paginando hasta agotar (sin tope silencioso)."""
+        first = self.get("/api/v1/prescriptions", token=token,
+                         params={"page": 1, "limit": page_size})
+        data = (first or {}).get("data") or {}
+        items = list(data.get("data") or [])
+        total_pages = (data.get("pagination") or {}).get("totalPages", 1)
+        for page in range(2, total_pages + 1):
+            nxt = self.get("/api/v1/prescriptions", token=token,
+                           params={"page": page, "limit": page_size})
+            items.extend(((nxt or {}).get("data") or {}).get("data") or [])
+        return {"data": items}
