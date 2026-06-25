@@ -16,3 +16,10 @@ frontend/.vite/
 
 # Vercel
 .vercel/
+
+# Railway (el link de la CLI vive en ~/.railway, fuera del repo; guarda por si acaso)
+.railway/
+
+# Variables locales — NO versionar secretos
+.env.local
+.env.*.local
