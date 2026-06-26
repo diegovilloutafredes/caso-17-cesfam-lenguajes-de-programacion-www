@@ -1,6 +1,6 @@
 # CESFAM Caso 17 — atajos de desarrollo y despliegue.
 # Backend: microservicios FastAPI + PostgreSQL (docker compose). Frontend: React/Vite.
-.PHONY: help setup dev up down clean logs test test-resilience front build deploy-back deploy-front cloud-status stop
+.PHONY: help setup dev up down clean logs test test-resilience front build deploy-back deploy-front cloud-status reset-cloud-db stop
 
 COMPOSE := docker compose -f backend-microservices/docker-compose.yml
 
@@ -50,6 +50,9 @@ deploy-front:  ## Despliega el frontend a la nube (Vercel). Requiere VITE_API_UR
 
 cloud-status:  ## Estado del despliegue del backend en Railway
 	cd backend-microservices && railway status
+
+reset-cloud-db:  ## Resetea las bases de la nube para re-aplicar el seed (DESTRUCTIVO)
+	./scripts/reset-cloud-db.sh
 
 # ── Utilidad ──────────────────────────────────────────────────────
 stop:  ## Detiene el stack local y libera puertos
