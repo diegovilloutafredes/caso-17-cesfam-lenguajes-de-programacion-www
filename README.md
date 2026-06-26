@@ -52,7 +52,7 @@ Backend del sistema de **Automatización de Libreta de Medicamentos CESFAM**, im
 
 ```
 backend-microservices/
-├── docker-compose.yml              ← orquestación de 7 containers
+├── docker-compose.yml              ← orquestación de 8 containers (PostgreSQL + 7 servicios)
 ├── Dockerfile                       ← imagen compartida (python:3.12-slim + deps)
 ├── .dockerignore
 ├── requirements.txt                 ← fastapi, uvicorn, pydantic, httpx, tenacity
@@ -74,7 +74,7 @@ backend-microservices/
 ├── api_gateway/                    (:8000)
 │   ├── main.py
 │   ├── clients/{identity,patient,inventory,prescription}.py
-│   └── routers/{auth,dashboards}.py
+│   └── routers/{auth,dashboards,proxy}.py
 │
 ├── identity_service/               (:8001)
 │   ├── main.py · schemas.py · seed.py
@@ -105,6 +105,9 @@ backend-microservices/
     └── routers/reports.py
 ```
 
+> Cada servicio de dominio incluye además `db.py` (engine + `SessionLocal`) y `models.py`
+> (modelos SQLAlchemy 2.0). La persistencia es **PostgreSQL, una base por servicio**.
+
 ---
 
 ## 2. Stack tecnológico
@@ -117,7 +120,11 @@ backend-microservices/
 | Validación / DTOs | **Pydantic** | 2.9.2 | Schemas tipados, parsing y serialización JSON |
 | Cliente HTTP | **httpx** | 0.27.2 | Llamadas inter-servicio sincrónicas (clientes que un servicio usa para hablarle a otro) |
 | Retry policy | **tenacity** | 8.5.0 | Decoradores declarativos para retry con backoff exponencial |
-| Contenedores | **Docker Desktop** | 24+ (Compose v2) | Orquestación de los 7 containers (modo recomendado) |
+| Persistencia | **PostgreSQL** | 16 | Base de datos por servicio (Database per Service) |
+| ORM | **SQLAlchemy** | 2.0.35 | Modelos y consultas (síncrono); invariante de stock con `SELECT FOR UPDATE` |
+| Driver DB | **psycopg2-binary** | 2.9.9 | Conector PostgreSQL |
+| Tests | **pytest** | 8.3.3 | Suite de integración cross-service |
+| Contenedores | **Docker Desktop** | 24+ (Compose v2) | Orquestación de 8 containers (7 servicios + PostgreSQL) |
 
 ---
 
@@ -145,8 +152,8 @@ Cada servicio tiene además:
 | Endpoint llamado | Servicio dueño | Servicios que invoca internamente (HTTP) |
 |-----------------|----------------|------------------------------------------|
 | `POST /api/v1/auth/login` (gateway) | ApiGateway | IdentityService |
-| `GET /api/v1/doctor/dashboard` (gateway) | ApiGateway | InventoryService (×2) + PatientService |
-| `GET /api/v1/pharmacy/dashboard` (gateway) | ApiGateway | PrescriptionService (×3) + InventoryService |
+| `GET /api/v1/doctor/dashboard` (gateway) | ApiGateway | PrescriptionService + PatientService |
+| `GET /api/v1/pharmacy/dashboard` (gateway) | ApiGateway | PrescriptionService + InventoryService |
 | `GET /api/v1/patients/{id}/history` | PatientService | PrescriptionService |
 | `POST /api/v1/prescriptions` (crear) | PrescriptionService | PatientService (valida que el paciente exista) |
 | `POST /api/v1/prescriptions/{id}/prepare` | PrescriptionService | InventoryService (reserveStock por línea) |
@@ -188,7 +195,7 @@ Tres comandos cubren el ciclo completo:
 cd backend-microservices
 chmod +x *.sh          # solo primera vez en macOS/Linux
 ./install.sh           # build de las 7 imágenes (~2 min primera vez)
-./run.sh               # arranca los 7 containers en background, muestra URLs
+./run.sh               # arranca los 8 containers en background, muestra URLs
 ```
 
 Para Windows, los mismos pasos pero con archivos `.bat`:
@@ -206,10 +213,13 @@ Tras `run.sh` / `run.bat`, abrir en el navegador: **http://localhost:8000/docs**
 ./stop.sh              # o stop.bat en Windows
 ```
 
-### Para resetear el estado a la seed inicial
+### Para resetear los datos a la seed inicial
+
+La persistencia es PostgreSQL: `down` + `up` **conserva** los datos. Para volver al seed hay
+que borrar el volumen:
 
 ```bash
-./stop.sh && ./run.sh   # docker compose down + up recrea containers desde la imagen
+docker compose down -v && ./run.sh   # -v borra el volumen de Postgres; al re-arrancar se siembra de nuevo
 ```
 
 ---
@@ -221,8 +231,8 @@ Tras `run.sh` / `run.bat`, abrir en el navegador: **http://localhost:8000/docs**
 | Script                       | Qué hace                                                                                                                                                                                         | Cuándo usarlo                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | `install.sh` / `install.bat` | Verifica que Docker está corriendo. Ejecuta `docker compose build` para construir las 7 imágenes a partir del Dockerfile compartido.                                                             | **Una sola vez** tras clonar el repo, o cuando cambia código. |
-| `run.sh` / `run.bat`         | Verifica Docker activo. Ejecuta `docker compose up -d` para arrancar los 7 containers en background. Espera unos segundos a que estén healthy. Imprime el estado y todas las URLs de Swagger UI. | Cada vez que quieres arrancar el sandbox.                     |
-| `stop.sh` / `stop.bat`       | Ejecuta `docker compose down`, detiene y elimina los 7 containers + la red Docker. **Las imágenes permanecen** (próxima vez `run.sh` es rápido).                                                 | Cuando terminas de trabajar.                                  |
+| `run.sh` / `run.bat`         | Verifica Docker activo. Ejecuta `docker compose up -d` para arrancar los 8 containers en background. Espera unos segundos a que estén healthy. Imprime el estado y todas las URLs de Swagger UI. | Cada vez que quieres arrancar el sandbox.                     |
+| `stop.sh` / `stop.bat`       | Ejecuta `docker compose down`, detiene y elimina los 8 containers + la red Docker. **Las imágenes permanecen** (próxima vez `run.sh` es rápido).                                                 | Cuando terminas de trabajar.                                  |
 
 ### Modo SIN Docker
 
@@ -333,14 +343,14 @@ curl http://localhost:8001/api/v1/auth/me \
 
 ## 10. Datos iniciales (seed)
 
-Cada servicio carga su propia seed al arrancar. Estado en memoria; al reiniciar el container, vuelve al seed.
+Cada servicio siembra su base al arrancar (PostgreSQL, una base por servicio). El seed es **idempotente**: solo corre si las tablas están vacías.
 
 | Servicio             | Qué hay precargado                                                                                                                                                                                                                          |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | identity_service     | **3 usuarios**                                                                                                                                                                                                                              |
 | patient_service      | **5 pacientes** (PAT-001 a PAT-005) + **2 apoderados** (GRD-001 hijo, GRD-002 esposo, ambos asociados a PAT-001)                                                                                                                            |
-| inventory_service    | **7 medicamentos** (MED-0001 Paracetamol, MED-0002 Ibuprofeno, MED-0003 Amoxicilina, MED-0004 Omeprazol, MED-0005 Enalapril, MED-0006 Aspirina, MED-0007 Losartán) + **7 partidas** (BCH-001 a BCH-007) con invariantes de stock respetadas |
-| prescription_service | **6 recetas** en distintos estados (R001-R004, R045, R012)                                                                                                                                                                                  |
+| inventory_service    | **14 medicamentos** (MED-0001 a MED-0014: Paracetamol, Ibuprofeno, Amoxicilina, Omeprazol, Enalapril, Aspirina, Losartán, Metformina, Atorvastatina, Amlodipino, Levotiroxina, Hidroclorotiazida, Sertralina, Furosemida) + **14 partidas** (BCH-001 a BCH-014) + **2 bajas** (WOF-001, WOF-002), con el invariante de stock respetado |
+| prescription_service | **15 recetas** en distintos estados (R001-R004, R012, R045, R050-R058)                                                                                                                                                                                  |
 | notification_service | **1 notificación histórica** (NTF-001)                                                                                                                                                                                                      |
 | report_service       | Sin estado, los reportes se generan on-demand                                                                                                                                                                                               |
 
@@ -372,7 +382,7 @@ curl -X POST http://localhost:8004/api/v1/prescriptions \
                  "doseDescription":"1 c/8h","durationDays":7,"totalQuantity":10}]}'
 
 # 5) Preparar receta (reserva stock cross-service)
-curl -X POST http://localhost:8004/api/v1/prescriptions/R046/prepare -H "Authorization: $TOKEN"
+curl -X POST http://localhost:8004/api/v1/prescriptions/R059/prepare -H "Authorization: $TOKEN"
 
 # 6) Verificar stock cambió en otro servicio
 curl http://localhost:8003/api/v1/medications/MED-0001 -H "Authorization: $TOKEN"
