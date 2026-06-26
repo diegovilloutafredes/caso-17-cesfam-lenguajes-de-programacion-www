@@ -2,7 +2,7 @@
 
 El diagrama de clases (`Caso17_Diagrama_Clases.drawio`) modela el dominio. Esta nota explica
 cómo cada elemento se realiza en los microservicios, para cerrar la trazabilidad diseño →
-código (C7). El diagrama se alineó con la implementación y con el diagrama v2 de
+código (C7). El diagrama se alineó con la implementación y con el diagrama de
 infraestructura/datos (que ya usaba `VARCHAR` y columnas embebidas).
 
 ## Identidad: claves naturales (String)
