@@ -1,15 +1,8 @@
-# Stack pineado a versiones estables y reproducibles.
-# Si necesitas actualizar, haz el cambio y verifica con ./run-tests.sh.
-
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 pydantic==2.9.2
 httpx==0.27.2
 tenacity==8.5.0
-
-# Persistencia (Database per Service, SQLAlchemy síncrono + psycopg2)
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
-
-# Tests
 pytest==8.3.3

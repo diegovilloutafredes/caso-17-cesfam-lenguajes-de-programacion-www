@@ -19,6 +19,6 @@ COPY notification_service/ ./notification_service/
 COPY report_service/ ./report_service/
 COPY api_gateway/ ./api_gateway/
 
-# Arranque co-locado para Railway (un servicio = los 7 procesos). En local no se usa:
+# Arranque para Railway (un servicio = los 7 procesos). En local no se usa:
 # docker-compose levanta un contenedor por servicio con su propio `command`.
 COPY railway-start.sh ./railway-start.sh
