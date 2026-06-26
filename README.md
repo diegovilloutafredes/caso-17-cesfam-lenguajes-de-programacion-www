@@ -4,6 +4,22 @@ Backend del sistema de **Automatización de Libreta de Medicamentos CESFAM**, im
 
 ---
 
+## Inicio rápido (correr todo en local)
+
+Requisitos: **Docker Desktop** (corriendo) y **Node 18+**.
+
+```bash
+make dev      # build + arranca el backend (7 servicios + Postgres) y el frontend
+```
+
+- App: <http://localhost:5173> · API/BFF: <http://localhost:8000>
+- Login: `drperez` (médico) / `mgonzalez` (farmacia) · detener: `Ctrl+C` o `make stop`
+
+`make dev` instala las dependencias solo: las del backend dentro de la imagen Docker
+(`pip install`) y las del frontend (`npm install`).
+
+---
+
 ## Tabla de contenidos
 
 1. [Arquitectura y estructura de microservicios](#1-arquitectura-y-estructura-de-microservicios)
