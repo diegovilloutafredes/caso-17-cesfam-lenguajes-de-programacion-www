@@ -6,6 +6,7 @@ import { Bar, Doughnut, ChartCard, CHART, baseOptions } from '../components/char
 import { Badge, Kpi, PageHeader, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
 import { prescriptionStatus, stockStatus } from '../lib/format'
+import { allowedActions } from '../lib/prescriptionActions'
 
 const TOP_WINDOWS = [
   { days: 30, label: 'Últimos 30 días' },
@@ -277,6 +278,7 @@ export default function PanelFarmacia() {
                 <tbody>
                   {queue.map((rx) => {
                     const st = prescriptionStatus(rx.status)
+                    const acts = allowedActions(rx.status)
                     return (
                       <tr key={rx.id}>
                         <td>
@@ -287,12 +289,12 @@ export default function PanelFarmacia() {
                           <Badge type={st.badge}>{st.label}</Badge>
                         </td>
                         <td className="actions">
-                          {rx.status === 'SUBMITTED' && (
+                          {acts.includes('prepare') && (
                             <button className="btn btn-primary btn-sm" onClick={() => handlePrepare(rx)}>
                               Preparar
                             </button>
                           )}
-                          {rx.status === 'READY_FOR_PICKUP' && (
+                          {acts.includes('deliver') && (
                             <button className="btn btn-success btn-sm" onClick={() => openDeliver(rx)}>
                               Entregar
                             </button>

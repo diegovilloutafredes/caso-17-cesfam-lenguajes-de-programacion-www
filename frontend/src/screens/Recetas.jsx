@@ -4,6 +4,7 @@ import Modal from '../components/Modal'
 import { SearchBar, Badge, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
 import { prescriptionStatus, fullName } from '../lib/format'
+import { allowedActions } from '../lib/prescriptionActions'
 
 const CHIPS = [
   { key: 'ALL', label: 'Todas', status: null },
@@ -213,6 +214,7 @@ export default function Recetas() {
             <tbody>
               {filtered.map((r) => {
                 const st = prescriptionStatus(r.status)
+                const acts = allowedActions(r.status)
                 const rut = patientRut(r)
                 const busy = busyId === r.id
                 return (
@@ -226,32 +228,25 @@ export default function Recetas() {
                     <td>{totalQuantity(r)}</td>
                     <td><Badge type={st.badge}>{st.label}</Badge></td>
                     <td className="actions">
-                      {r.status === 'SUBMITTED' && (
-                        <>
-                          <button
-                            className="btn btn-success btn-sm"
-                            disabled={busy}
-                            onClick={() => runAction(r.id, () => prescriptionsApi.markAvailable(r.id), 'Marcada disponible')}
-                          >
-                            Marcar disponible
-                          </button>
-                          <button
-                            className="btn btn-warning btn-sm"
-                            disabled={busy}
-                            onClick={() => runAction(r.id, () => prescriptionsApi.reserve(r.id), 'Receta reservada')}
-                          >
-                            Reservar
-                          </button>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            disabled={busy}
-                            onClick={() => runAction(r.id, () => prescriptionsApi.cancel(r.id, { reason: 'Anulada desde recetas' }), 'Receta anulada')}
-                          >
-                            Anular
-                          </button>
-                        </>
+                      {acts.includes('prepare') && (
+                        <button
+                          className="btn btn-success btn-sm"
+                          disabled={busy}
+                          onClick={() => runAction(r.id, () => prescriptionsApi.prepare(r.id), 'Receta preparada')}
+                        >
+                          Preparar
+                        </button>
                       )}
-                      {r.status === 'RESERVED' && (
+                      {acts.includes('reserve') && (
+                        <button
+                          className="btn btn-warning btn-sm"
+                          disabled={busy}
+                          onClick={() => runAction(r.id, () => prescriptionsApi.reserve(r.id), 'Receta reservada')}
+                        >
+                          Reservar
+                        </button>
+                      )}
+                      {acts.includes('markAvailable') && (
                         <button
                           className="btn btn-success btn-sm"
                           disabled={busy}
@@ -260,12 +255,21 @@ export default function Recetas() {
                           Marcar disponible
                         </button>
                       )}
-                      {r.status === 'READY_FOR_PICKUP' && (
+                      {acts.includes('deliver') && (
                         <button
                           className="btn btn-success btn-sm"
                           onClick={() => openPickup(r)}
                         >
                           Confirmar Retiro
+                        </button>
+                      )}
+                      {acts.includes('cancel') && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          disabled={busy}
+                          onClick={() => runAction(r.id, () => prescriptionsApi.cancel(r.id, { reason: 'Anulada desde recetas' }), 'Receta anulada')}
+                        >
+                          Anular
                         </button>
                       )}
                     </td>
