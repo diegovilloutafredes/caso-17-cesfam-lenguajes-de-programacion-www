@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,7 +10,7 @@ from patient_service.clients.prescription import PrescriptionServiceClient
 from patient_service.db import get_session
 from patient_service.models import Guardian, Patient
 from patient_service.schemas import GuardianCreate, PatientUpdate
-from shared.auth import current_token, current_user
+from shared.auth import current_token, current_user, require_role
 from shared.envelope import created, ok
 from shared.ids import next_id
 
@@ -122,7 +123,7 @@ def get_patient(
 def update_patient(
     patient_id: str,
     body: PatientUpdate,
-    _: dict = Depends(current_user),
+    _: dict = Depends(require_role("pharmacy_staff")),
     db: Session = Depends(get_session),
 ):
     p = db.get(Patient, patient_id)
@@ -178,11 +179,23 @@ def list_guardians(
 def add_guardian(
     patient_id: str,
     body: GuardianCreate,
-    _: dict = Depends(current_user),
+    _: dict = Depends(require_role("pharmacy_staff")),
     db: Session = Depends(get_session),
 ):
     if not db.get(Patient, patient_id):
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Paciente no encontrado"})
+    duplicated = db.execute(
+        select(Guardian).where(
+            Guardian.patientId == patient_id, Guardian.rut == body.rut,
+        )
+    ).scalar_one_or_none()
+    if duplicated:
+        raise HTTPException(409, detail={
+            "code": "DUPLICATE_GUARDIAN",
+            "message": f"El RUT {body.rut} ya está registrado como apoderado de este paciente",
+        })
+    if body.authorizationDate is None:
+        body.authorizationDate = date.today()
     payload = body.model_dump(mode="json")
     # dos altas concurrentes pueden calcular el mismo ID; se reintenta
     for _ in range(3):
@@ -214,7 +227,7 @@ def add_guardian(
 def remove_guardian(
     patient_id: str,
     guardian_id: str,
-    _: dict = Depends(current_user),
+    _: dict = Depends(require_role("pharmacy_staff")),
     db: Session = Depends(get_session),
 ):
     g = db.get(Guardian, guardian_id)

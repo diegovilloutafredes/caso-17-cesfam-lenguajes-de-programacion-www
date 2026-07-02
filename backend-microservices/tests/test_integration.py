@@ -62,6 +62,48 @@ def test_medication_detail_via_proxy(client, auth):
     assert {"availableQuantity", "reservedQuantity", "physicalQuantity"} <= d["stock"].keys()
 
 
+def test_update_patient_persists(client, auth, pharmacy_auth):
+    """La edición de la ficha persiste y exige rol de farmacia."""
+    before = client.get("/api/v1/patients/PAT-003", headers=auth).json()["data"]
+    r = client.put("/api/v1/patients/PAT-003", headers=auth, json={"phone": "+56 9 0000 0000"})
+    assert r.status_code == 403
+    r = client.put("/api/v1/patients/PAT-003", headers=pharmacy_auth, json={"phone": "+56 9 4040 3030"})
+    assert r.status_code == 200
+    after = client.get("/api/v1/patients/PAT-003", headers=auth).json()["data"]
+    assert after["phone"] == "+56 9 4040 3030"
+    client.put("/api/v1/patients/PAT-003", headers=pharmacy_auth, json={"phone": before["phone"]})
+
+
+def test_guardian_management_cycle(client, auth, pharmacy_auth):
+    """Registrar, duplicar (rechazado), retirar con el apoderado y quitarlo."""
+    body = {"rut": "9.876.543-3", "firstName": "Rosa", "lastName": "Ramírez",
+            "relationship": "Hija", "phone": "+56 9 5555 4444"}
+    r = client.post("/api/v1/patients/PAT-002/guardians", headers=pharmacy_auth, json=body)
+    assert r.status_code == 201
+    gid = r.json()["data"]["id"]
+    assert r.json()["data"]["authorizationDate"]  # default: hoy
+
+    dup = client.post("/api/v1/patients/PAT-002/guardians", headers=pharmacy_auth, json=body)
+    assert dup.json()["error"]["code"] == "DUPLICATE_GUARDIAN"
+    assert client.post("/api/v1/patients/PAT-002/guardians", headers=auth, json=body).status_code == 403
+
+    # el apoderado recién registrado puede retirar una receta del paciente
+    rid = _create(client, auth, [_item("MED-0001", 3)]).json()["data"]["id"]
+    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth)
+    delivered = client.post(
+        f"/api/v1/prescriptions/{rid}/deliver", headers=pharmacy_auth,
+        json={"pickerType": "guardian", "guardianId": gid,
+              "batches": [{"batchId": "BCH-001", "quantity": 3}]},
+    ).json()["data"]
+    assert delivered["status"] == "PICKED_UP"
+    assert delivered["delivery"]["guardianId"] == gid
+
+    r = client.delete(f"/api/v1/patients/PAT-002/guardians/{gid}", headers=pharmacy_auth)
+    assert r.status_code == 200
+    ids = {g["id"] for g in client.get("/api/v1/patients/PAT-002/guardians", headers=auth).json()["data"]}
+    assert gid not in ids
+
+
 def test_full_flow_create_prepare_deliver(client, auth, pharmacy_auth):
     before = _stock(client, auth)
     r = _create(client, auth, [_item("MED-0001", 10)])
