@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from identity_service.db import get_session
 from identity_service.models import User
 from identity_service.schemas import LoginRequest
+from identity_service.security import verify_password
 from shared.auth import current_user
 from shared.envelope import ok
 
@@ -13,12 +14,15 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Autenticación"])
 
 @router.post("/login")
 def login(body: LoginRequest, db: Session = Depends(get_session)):
-    """Login sandbox: acepta cualquier credencial."""
+    """Valida usuario y contraseña; el token emitido sigue siendo el stub sandbox."""
     user = db.execute(
         select(User).where(User.username == body.username)
-    ).scalar_one_or_none() or db.execute(
-        select(User).order_by(User.id)
-    ).scalars().first()
+    ).scalar_one_or_none()
+    if user is None or not verify_password(body.password, user.passwordHash):
+        raise HTTPException(401, detail={
+            "code": "INVALID_CREDENTIALS",
+            "message": "Usuario o contraseña incorrectos",
+        })
     return ok({
         "token": f"sandbox-token-{user.id}",
         "user": user.to_dict(),

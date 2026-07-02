@@ -16,7 +16,6 @@ class DeliveryStatus(str, Enum):
 
 
 class NotificationEvent(str, Enum):
-    STOCK_ARRIVED = "STOCK_ARRIVED"
     RESERVATION_AVAILABLE = "RESERVATION_AVAILABLE"
     PICKUP_REMINDER = "PICKUP_REMINDER"
 

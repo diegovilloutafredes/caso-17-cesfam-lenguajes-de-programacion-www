@@ -19,9 +19,11 @@ class Medication(Base):
     content: Mapped[str] = mapped_column(String)
     packaging: Mapped[str] = mapped_column(String)
     minStock: Mapped[int] = mapped_column(Integer)
-    # invariante: physical = available + reserved
+    # invariante: physical = available + reserved + isolated
     availableQuantity: Mapped[int] = mapped_column(Integer, default=0)
     reservedQuantity: Mapped[int] = mapped_column(Integer, default=0)
+    # caducado sin desechar: sigue en farmacia, apartado del stock entregable
+    isolatedQuantity: Mapped[int] = mapped_column(Integer, default=0)
     physicalQuantity: Mapped[int] = mapped_column(Integer, default=0)
 
 

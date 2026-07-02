@@ -6,8 +6,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_service.db import get_session
-from inventory_service.models import WriteOff
-from shared.auth import current_user
+from inventory_service.models import Medication, WriteOff
+from shared.auth import current_user, require_role
 from shared.envelope import ok
 
 router = APIRouter(prefix="/api/v1/write-offs", tags=["Bajas"])
@@ -63,6 +63,40 @@ def list_write_offs(
             "totalPages": (total + limit - 1) // limit if total else 0,
         },
     })
+
+
+@router.post("/{write_off_id}/discard")
+def discard_write_off(
+    write_off_id: str,
+    db: Session = Depends(get_session),
+    _: dict = Depends(require_role("pharmacy_staff")),
+):
+    """Desecha unidades aisladas por una baja: recién aquí se descuenta el físico (RF4)."""
+    w = db.execute(
+        select(WriteOff).where(WriteOff.id == write_off_id).with_for_update()
+    ).scalar_one_or_none()
+    if not w:
+        raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Baja no encontrada"})
+    if w.status == "DISCARDED":
+        raise HTTPException(409, detail={
+            "code": "INVALID_STATE",
+            "message": "Las unidades de esta baja ya fueron desechadas",
+        })
+    med = db.execute(
+        select(Medication).where(Medication.id == w.medicationId).with_for_update()
+    ).scalar_one_or_none()
+    if med:
+        if w.quantity > med.isolatedQuantity:
+            raise HTTPException(409, detail={
+                "code": "INVALID_STATE",
+                "message": f"La baja ({w.quantity}) excede lo aislado ({med.isolatedQuantity})",
+            })
+        med.isolatedQuantity -= w.quantity
+        med.physicalQuantity -= w.quantity
+    w.status = "DISCARDED"
+    w.discardDate = date.today().isoformat()
+    db.commit()
+    return ok(_serialize_write_off(w))
 
 
 @router.get("/{write_off_id}")

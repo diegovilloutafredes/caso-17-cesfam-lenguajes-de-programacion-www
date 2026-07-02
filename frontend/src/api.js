@@ -62,6 +62,7 @@ export const inventoryApi = {
   addBatch: (id, body) => api.post(`/api/v1/medications/${id}/batches`, body),
   writeOff: (batchId, body) => api.post(`/api/v1/batches/${batchId}/write-off`, body),
   listWriteOffs: (params) => api.get('/api/v1/write-offs', { params }),
+  discardWriteOff: (id) => api.post(`/api/v1/write-offs/${id}/discard`),
 }
 
 export const prescriptionsApi = {
@@ -85,6 +86,11 @@ export const dashboardsApi = {
   doctor: () => api.get('/api/v1/doctor/dashboard'),
   pharmacy: () => api.get('/api/v1/pharmacy/dashboard'),
   pharmacyTopMedications: (days) => api.get('/api/v1/pharmacy/top-medications', { params: { days } }),
+}
+
+export const analyticsApi = {
+  prescriptionTrend: (dateFrom, dateTo) =>
+    api.get('/api/v1/analytics/prescription-trend', { params: { dateFrom, dateTo } }),
 }
 
 export const reportsApi = {

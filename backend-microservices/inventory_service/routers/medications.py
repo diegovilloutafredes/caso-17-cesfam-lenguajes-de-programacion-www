@@ -32,6 +32,7 @@ def _serialize_med(med: Medication) -> dict:
         "stock": {
             "availableQuantity": med.availableQuantity,
             "reservedQuantity": med.reservedQuantity,
+            "isolatedQuantity": med.isolatedQuantity,
             "physicalQuantity": med.physicalQuantity,
         },
     }

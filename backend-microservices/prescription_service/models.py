@@ -21,6 +21,8 @@ class Prescription(Base):
     durationDays: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String, index=True)
     nextScheduledDelivery: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # fecha en que se emitió el recordatorio de próximo retiro, para no repetirlo
+    reminderSentAt: Mapped[date | None] = mapped_column(Date, nullable=True)
     externalPurchaseNotes: Mapped[str | None] = mapped_column(String, nullable=True)
     cancelReason: Mapped[str | None] = mapped_column(String, nullable=True)
     delivery: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

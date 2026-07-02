@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
-import { dashboardsApi, patientsApi, inventoryApi, prescriptionsApi } from '../api'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { analyticsApi, dashboardsApi, patientsApi, inventoryApi, prescriptionsApi } from '../api'
 import Modal from '../components/Modal'
 import ActivePrescriptionsList from '../components/ActivePrescriptionsList'
-import { Doughnut, ChartCard, CHART, baseOptions } from '../components/charts'
+import { Doughnut, Line, ChartCard, CHART, baseOptions } from '../components/charts'
 import { SearchBar, PageHeader, Empty, Badge } from '../components/ui'
 import { useToast } from '../context/ToastContext'
 import { prescriptionStatus, fullName, computeStockStatus } from '../lib/format'
@@ -15,6 +15,12 @@ const emptyForm = {
   treatmentType: 'SHORT',
   totalQuantity: '',
 }
+
+const TREND_WINDOWS = [
+  { days: 30, label: 'Últimos 30 días' },
+  { days: 90, label: 'Últimos 90 días' },
+  { days: 365, label: 'Último año' },
+]
 
 const STATE_COLORS = {
   SUBMITTED: CHART.primary,
@@ -46,6 +52,10 @@ export default function PanelMedico() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState(null)
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  const [trend, setTrend] = useState(null)
+  const [trendDays, setTrendDays] = useState(90)
+  const trendReqRef = useRef(0)
 
   const [rxOpen, setRxOpen] = useState(false)
   const [medications, setMedications] = useState([])
@@ -91,6 +101,22 @@ export default function PanelMedico() {
   }, [search, showToast])
 
   const patients = results ?? (dashboard?.recentPatients || [])
+
+  // Tendencia de emisiones y entregas en la ventana elegida.
+  useEffect(() => {
+    const req = ++trendReqRef.current
+    const to = new Date()
+    const from = new Date()
+    from.setDate(from.getDate() - trendDays)
+    analyticsApi
+      .prescriptionTrend(from.toISOString().slice(0, 10), to.toISOString().slice(0, 10))
+      .then((d) => {
+        if (trendReqRef.current === req) setTrend(d)
+      })
+      .catch((err) => {
+        if (trendReqRef.current === req) showToast('Error al cargar la tendencia', err.message, 'danger')
+      })
+  }, [trendDays, showToast])
 
   async function openHistory(patientId) {
     setHistoryOpen(true)
@@ -176,6 +202,32 @@ export default function PanelMedico() {
 
   const selectedMed = medications.find((m) => m.id === form.medicationId)
 
+  const trendData = trend?.series?.length > 0 && {
+    labels: trend.series.map((s) => s.date),
+    datasets: [
+      {
+        label: 'Emitidas',
+        data: trend.series.map((s) => s.emission),
+        borderColor: CHART.primary,
+        backgroundColor: CHART.primary,
+        pointRadius: 0,
+        tension: 0.3,
+      },
+      {
+        label: 'Entregadas',
+        data: trend.series.map((s) => s.delivery),
+        borderColor: CHART.success,
+        backgroundColor: CHART.success,
+        pointRadius: 0,
+        tension: 0.3,
+      },
+    ],
+  }
+  const trendOptions = {
+    ...baseOptions,
+    scales: { x: { ticks: { maxTicksLimit: 8 } }, y: { beginAtZero: true, ticks: { precision: 0 } } },
+  }
+
   return (
     <>
       <PageHeader title="Panel Médico" subtitle="Gestión de pacientes y prescripciones">
@@ -192,10 +244,29 @@ export default function PanelMedico() {
 
       {!loading && (
         <>
-          {/* Reportería clínica: estado de las recetas */}
-          <section className="mb-4">
+          {/* Reportería clínica: estado y tendencia de las recetas */}
+          <section className="grid grid-2 mb-4">
             <ChartCard title="Recetas por estado" subtitle="Panorama de las recetas del sistema">
               {stateData ? <Doughnut data={stateData} options={baseOptions} /> : <Empty>Sin recetas.</Empty>}
+            </ChartCard>
+            <ChartCard
+              title="Tendencia de recetas"
+              subtitle={`Emitidas y entregadas · ${trend ? `${trend.totals.emission} emitidas, ${trend.totals.delivery} entregadas` : 'cargando…'}`}
+              actions={
+                <select
+                  className="select"
+                  style={{ width: 'auto' }}
+                  aria-label="Ventana de tiempo de la tendencia"
+                  value={trendDays}
+                  onChange={(e) => setTrendDays(Number(e.target.value))}
+                >
+                  {TREND_WINDOWS.map((w) => (
+                    <option key={w.days} value={w.days}>{w.label}</option>
+                  ))}
+                </select>
+              }
+            >
+              {trendData ? <Line data={trendData} options={trendOptions} /> : <Empty>Sin datos en la ventana.</Empty>}
             </ChartCard>
           </section>
 

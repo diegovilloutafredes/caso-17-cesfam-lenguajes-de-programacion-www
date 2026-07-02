@@ -287,16 +287,16 @@ Los logs en macOS/Linux quedan en `./logs/<servicio>.log`. En Windows aparecen e
 
 ---
 
-## 9. Usuarios dummy para probar el sandbox
+## 9. Usuarios de demostración
 
-El sandbox **acepta cualquier credencial** en el login, (no valida password). Pero el `username` determina qué usuario "asume" la sesión, lo cual define el rol que ven los demás endpoints.
+El login valida usuario y contraseña contra IdentityService; credenciales inválidas devuelven 401. El token emitido sigue siendo un stub de sandbox (`sandbox-token-USR-XXX`), que es lo que los demás servicios usan para resolver la identidad y el rol.
 
 ### Login y token
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"drperez","password":"cualquiercosa"}'
+  -d '{"username":"drperez","password":"medico2026"}'
 ```
 
 Devuelve:
@@ -318,13 +318,13 @@ Devuelve:
 }
 ```
 
-### Tabla de usuarios dummy disponibles
+### Credenciales de demostración
 
-| username    | Token resultante        | Usuario        | Rol                | Para probar                                              |
-| ----------- | ----------------------- | -------------- | ------------------ | -------------------------------------------------------- |
-| `drperez`   | `sandbox-token-USR-001` | Dr. Juan Pérez | **doctor**         | Flujos médicos: crear recetas, ver historial paciente    |
-| `dralopez`  | `sandbox-token-USR-003` | Dra. Ana López | **doctor**         | Médico alternativo                                       |
-| `mgonzalez` | `sandbox-token-USR-002` | María González | **pharmacy_staff** | Flujos farmacia: preparar, entregar, write-offs, reports |
+| username    | password       | Token resultante        | Usuario        | Rol                | Para probar                                              |
+| ----------- | -------------- | ----------------------- | -------------- | ------------------ | -------------------------------------------------------- |
+| `drperez`   | `medico2026`   | `sandbox-token-USR-001` | Dr. Juan Pérez | **doctor**         | Flujos médicos: crear recetas, ver historial paciente    |
+| `dralopez`  | `medico2026`   | `sandbox-token-USR-003` | Dra. Ana López | **doctor**         | Médico alternativo                                       |
+| `mgonzalez` | `farmacia2026` | `sandbox-token-USR-002` | María González | **pharmacy_staff** | Flujos farmacia: preparar, entregar, write-offs, reports |
 
 ### Cómo usar el token
 
@@ -346,7 +346,7 @@ En **Swagger UI**, (recomendado para explorar):
 # Login como pharmacy_staff
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"mgonzalez","password":"x"}'
+  -d '{"username":"mgonzalez","password":"farmacia2026"}'
 # → token sandbox-token-USR-002
 
 # Verificar que /me retorna pharmacy_staff (no default doctor)
@@ -381,7 +381,7 @@ TOKEN="Bearer sandbox-token-USR-001"
 
 # 1) Login (passthrough gateway → identity)
 curl -X POST http://localhost:8000/api/v1/auth/login \
-  -H "Content-Type: application/json" -d '{"username":"drperez","password":"x"}'
+  -H "Content-Type: application/json" -d '{"username":"drperez","password":"medico2026"}'
 
 # 2) Dashboard del médico (1 call → 3 servicios)
 curl http://localhost:8000/api/v1/doctor/dashboard -H "Authorization: $TOKEN"
@@ -419,7 +419,7 @@ done
 # Login + verificación de identidad
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"drperez","password":"x"}'
+  -d '{"username":"drperez","password":"medico2026"}'
 # → ApiResponse con token sandbox-token-USR-001
 
 # Cross-service flow completo: ver el §10 anterior

@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -120,6 +120,73 @@ def _expire_overdue(db: Session, token: str) -> None:
         db.commit()
 
 
+def _notify_patient_or_guardian(r: Prescription, event: str, message: str, token: str) -> None:
+    """Aviso por correo y SMS al paciente; sin contacto, cae al primer apoderado con datos (RF11)."""
+    try:
+        patient = (patient_client.get_patient(r.patientId, token=token) or {}).get("data") or {}
+        email, phone, guardian_id = patient.get("email"), patient.get("phone"), None
+        if not email and not phone:
+            g_resp = patient_client.list_guardians(r.patientId, token=token)
+            for g in (g_resp.get("data") or []):
+                if g.get("email") or g.get("phone"):
+                    email, phone, guardian_id = g.get("email"), g.get("phone"), g.get("id")
+                    break
+        base = {
+            "event": event,
+            "recipientPatientId": r.patientId,
+            "recipientGuardianId": guardian_id,
+            "message": message,
+            "prescriptionId": r.id,
+        }
+        sent = False
+        if email:
+            resp = notification_client.send(
+                {**base, "type": "EMAIL", "recipientAddress": email}, token=token)
+            sent = sent or not _has_error(resp)
+        if phone:
+            resp = notification_client.send(
+                {**base, "type": "SMS", "recipientAddress": phone}, token=token)
+            sent = sent or not _has_error(resp)
+        if not sent:
+            logger.warning("Receta %s: aviso %s sin destinatario contactable", r.id, event)
+    except Exception:
+        logger.warning("Receta %s: falló el envío del aviso %s", r.id, event, exc_info=True)
+
+
+REMINDER_DAYS = 3
+
+
+def _remind_upcoming(db: Session, token: str) -> None:
+    """Recordatorio de próximo retiro cuando el plazo está por vencer (RF13); se emite una sola vez."""
+    today = date.today()
+    due = db.execute(
+        select(Prescription.id).where(
+            Prescription.nextScheduledDelivery.is_not(None),
+            Prescription.nextScheduledDelivery >= today,
+            Prescription.nextScheduledDelivery <= today + timedelta(days=REMINDER_DAYS),
+            Prescription.reminderSentAt.is_(None),
+            Prescription.status.not_in(["CANCELLED", "EXPIRED", "EXTERNAL_PURCHASE"]),
+        )
+    ).scalars().all()
+    for rid in due:
+        r = db.execute(
+            select(Prescription)
+            .where(Prescription.id == rid)
+            .with_for_update(skip_locked=True)
+        ).scalar_one_or_none()
+        if not r or r.reminderSentAt is not None:
+            db.rollback()
+            continue
+        _notify_patient_or_guardian(
+            r, "PICKUP_REMINDER",
+            f"Su próximo retiro de medicamentos vence el {r.nextScheduledDelivery.isoformat()}. "
+            f"Receta {r.id}.",
+            token,
+        )
+        r.reminderSentAt = today
+        db.commit()
+
+
 @router.get("")
 def list_prescriptions(
     status_filter: Optional[str] = None,
@@ -131,6 +198,7 @@ def list_prescriptions(
     db: Session = Depends(get_session),
 ):
     _expire_overdue(db, token)
+    _remind_upcoming(db, token)
     stmt = select(Prescription)
     if status_filter:
         stmt = stmt.where(
@@ -159,6 +227,7 @@ def queue(
     db: Session = Depends(get_session),
 ):
     _expire_overdue(db, token)
+    _remind_upcoming(db, token)
     items = db.execute(
         select(Prescription)
         .where(Prescription.status.in_(["SUBMITTED", "RESERVED"]))
@@ -329,22 +398,12 @@ def mark_available(
     r.status = "READY_FOR_PICKUP"
     db.commit()
 
-    # notificación opcional: no bloquea el cambio de estado
-    try:
-        patient_resp = patient_client.get_patient(r.patientId, token=token)
-        patient = (patient_resp or {}).get("data") or {}
-        recipient_email = patient.get("email")
-        if recipient_email:
-            notification_client.send({
-                "type": "EMAIL",
-                "event": "RESERVATION_AVAILABLE",
-                "recipientPatientId": r.patientId,
-                "recipientAddress": recipient_email,
-                "message": f"Su medicamento está disponible para retiro. Receta {r.id}.",
-                "prescriptionId": r.id,
-            }, token=token)
-    except Exception:
-        pass
+    # notificación best-effort: no bloquea el cambio de estado
+    _notify_patient_or_guardian(
+        r, "RESERVATION_AVAILABLE",
+        f"Su medicamento está disponible para retiro. Receta {r.id}.",
+        token,
+    )
 
     return ok(_serialize(r))
 
@@ -468,6 +527,9 @@ def deliver(
         })
 
     r.status = "PICKED_UP"
+    # tratamiento largo: la dotación cubre durationDays y ahí vence el próximo retiro
+    if r.treatmentType == "LONG":
+        r.nextScheduledDelivery = date.today() + timedelta(days=r.durationDays)
     r.delivery = {
         "pickerType": body.pickerType,
         "guardianId": body.guardianId,

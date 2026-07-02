@@ -34,7 +34,7 @@ Documentación Swagger UI:
 Probar login:
   curl -X POST http://localhost:8000/api/v1/auth/login \\
     -H "Content-Type: application/json" \\
-    -d '{"username":"drperez","password":"x"}'
+    -d '{"username":"drperez","password":"medico2026"}'
 
 Detener:             ./stop.sh
 Ver logs:            docker compose logs -f <servicio>

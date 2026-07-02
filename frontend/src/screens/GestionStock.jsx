@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { inventoryApi, reportsApi } from '../api'
+import { inventoryApi, prescriptionsApi, reportsApi } from '../api'
 import Modal from '../components/Modal'
 import { Badge, Kpi, SearchBar, PageHeader, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
@@ -33,6 +33,9 @@ export default function GestionStock() {
   const [addOpen, setAddOpen] = useState(false)
   const [writeOffBatch, setWriteOffBatch] = useState(null) // batch sobre el que se da de baja
   const [reportOpen, setReportOpen] = useState(false)
+  const [auditOpen, setAuditOpen] = useState(false)
+  const [writeOffs, setWriteOffs] = useState([])
+  const [auditLoading, setAuditLoading] = useState(false)
 
   // Formularios
   const [addForm, setAddForm] = useState({ medicationId: '', batchNumber: '', initialQuantity: '', expirationDate: '' })
@@ -114,9 +117,57 @@ export default function GestionStock() {
       })
       setAddOpen(false)
       showToast('Partida registrada', 'Stock actualizado.', 'success')
+      notifyReservedWaiting(addForm.medicationId)
       await load()
     } catch (err) {
       showToast('Error al ingresar stock', err.message, 'danger')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Al recibir una partida, avisa si hay recetas reservadas esperando ese medicamento (RF11).
+  async function notifyReservedWaiting(medicationId) {
+    try {
+      const res = await prescriptionsApi.list({ status_filter: 'RESERVED', limit: 100 })
+      const waiting = (res.data || []).filter((r) =>
+        r.items?.some((it) => it.medicationId === medicationId),
+      )
+      if (waiting.length > 0) {
+        showToast(
+          'Recetas reservadas esperando',
+          `${waiting.length} receta(s) de este medicamento pueden marcarse disponibles en Recetas.`,
+          'info',
+        )
+      }
+    } catch {
+      /* el aviso es informativo */
+    }
+  }
+
+  async function openAudit() {
+    setAuditOpen(true)
+    setAuditLoading(true)
+    try {
+      const res = await inventoryApi.listWriteOffs({ page: 1, limit: 100 })
+      setWriteOffs(res.data || [])
+    } catch (err) {
+      showToast('Error al cargar las bajas', err.message, 'danger')
+    } finally {
+      setAuditLoading(false)
+    }
+  }
+
+  async function discardWriteOff(w) {
+    setSaving(true)
+    try {
+      await inventoryApi.discardWriteOff(w.id)
+      showToast('Unidades desechadas', 'El stock físico quedó descontado.', 'warning')
+      const res = await inventoryApi.listWriteOffs({ page: 1, limit: 100 })
+      setWriteOffs(res.data || [])
+      await refresh(detail?.id)
+    } catch (err) {
+      showToast('Error al desechar', err.message, 'danger')
     } finally {
       setSaving(false)
     }
@@ -168,6 +219,7 @@ export default function GestionStock() {
     <>
       <PageHeader title="Gestión de Stock" subtitle="Control de inventario de medicamentos">
         <div className="row">
+          <button className="btn btn-outline btn-sm" onClick={openAudit}>Bajas registradas</button>
           <button className="btn btn-outline btn-sm" onClick={() => setReportOpen(true)}>Generar informe .CSV</button>
           <button className="btn btn-primary" onClick={() => openAdd()}>＋ Ingresar Stock</button>
         </div>
@@ -297,9 +349,10 @@ export default function GestionStock() {
 
               <div className="modal-section">
                 <h3>Stock actual</h3>
-                <div className="grid grid-3">
+                <div className="grid grid-4">
                   <Kpi icon="✓" num={detail.stock?.availableQuantity ?? 0} label="Disponible" type="success" />
                   <Kpi icon="⏱" num={detail.stock?.reservedQuantity ?? 0} label="Reservado" type="warning" />
+                  <Kpi icon="⨯" num={detail.stock?.isolatedQuantity ?? 0} label="Aislado" type="danger" />
                   <Kpi icon="📦" num={detail.stock?.physicalQuantity ?? 0} label="Físico" type="info" />
                 </div>
               </div>
@@ -490,28 +543,98 @@ export default function GestionStock() {
             ))}
           </select>
         </div>
-        <div className="grid grid-2 mt-3">
-          <div className="input-group">
-            <label htmlFor="report-from">Desde</label>
-            <input
-              id="report-from"
-              className="input"
-              type="date"
-              value={reportForm.dateFrom}
-              onChange={(e) => setReportForm({ ...reportForm, dateFrom: e.target.value })}
-            />
+        {reportForm.reportType === 'STOCK' ? (
+          <p className="text-soft mt-3" style={{ marginBottom: 0 }}>
+            El informe de stock es una foto del inventario actual, no lleva rango de fechas.
+          </p>
+        ) : (
+          <div className="grid grid-2 mt-3">
+            <div className="input-group">
+              <label htmlFor="report-from">Desde</label>
+              <input
+                id="report-from"
+                className="input"
+                type="date"
+                value={reportForm.dateFrom}
+                onChange={(e) => setReportForm({ ...reportForm, dateFrom: e.target.value })}
+              />
+            </div>
+            <div className="input-group">
+              <label htmlFor="report-to">Hasta</label>
+              <input
+                id="report-to"
+                className="input"
+                type="date"
+                value={reportForm.dateTo}
+                onChange={(e) => setReportForm({ ...reportForm, dateTo: e.target.value })}
+              />
+            </div>
           </div>
-          <div className="input-group">
-            <label htmlFor="report-to">Hasta</label>
-            <input
-              id="report-to"
-              className="input"
-              type="date"
-              value={reportForm.dateTo}
-              onChange={(e) => setReportForm({ ...reportForm, dateTo: e.target.value })}
-            />
-          </div>
-        </div>
+        )}
+      </Modal>
+
+      {/* Modal: auditoría de bajas */}
+      <Modal
+        open={auditOpen}
+        onClose={() => setAuditOpen(false)}
+        large
+        title="Bajas registradas"
+        subtitle="Las unidades caducadas quedan aisladas; el stock físico se descuenta al desecharlas."
+        actions={
+          <button className="btn btn-outline" onClick={() => setAuditOpen(false)}>Cerrar</button>
+        }
+      >
+        {auditLoading ? (
+          <Empty>Cargando bajas…</Empty>
+        ) : writeOffs.length === 0 ? (
+          <Empty>No hay bajas registradas.</Empty>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Medicamento</th>
+                <th>Partida</th>
+                <th>Motivo</th>
+                <th>Cantidad</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {writeOffs.map((w) => {
+                const med = medications.find((m) => m.id === w.medicationId)
+                const reason = WRITE_OFF_REASONS.find((r) => r.value === w.reason)
+                const pending = w.status === 'DEDUCTED_FROM_AVAILABLE'
+                return (
+                  <tr key={w.id}>
+                    <td>{w.expiredAt}</td>
+                    <td>{med?.description || w.medicationId}</td>
+                    <td>{w.batchId}</td>
+                    <td>{reason?.label || w.reason}</td>
+                    <td>{w.quantity}</td>
+                    <td>
+                      <Badge type={pending ? 'warning' : 'muted'}>
+                        {pending ? 'Aislado' : 'Desechado'}
+                      </Badge>
+                    </td>
+                    <td>
+                      {pending && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          disabled={saving}
+                          onClick={() => discardWriteOff(w)}
+                        >
+                          Desechar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </Modal>
     </>
   )

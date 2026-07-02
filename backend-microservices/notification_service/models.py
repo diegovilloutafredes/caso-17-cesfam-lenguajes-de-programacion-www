@@ -14,7 +14,7 @@ class Notification(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)  # "NTF-001"
     type: Mapped[str] = mapped_column(String)  # SMS | EMAIL
-    event: Mapped[str] = mapped_column(String)  # STOCK_ARRIVED | RESERVATION_AVAILABLE | PICKUP_REMINDER
+    event: Mapped[str] = mapped_column(String)  # RESERVATION_AVAILABLE | PICKUP_REMINDER
     recipientPatientId: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     recipientGuardianId: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     recipientAddress: Mapped[str] = mapped_column(String)

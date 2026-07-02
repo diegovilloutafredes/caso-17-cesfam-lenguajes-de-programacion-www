@@ -2,11 +2,14 @@ from sqlalchemy import select
 
 from identity_service.db import SessionLocal
 from identity_service.models import User
+from identity_service.security import hash_password
 
+# credenciales de demostración; también figuran en el README
 USERS = [
     {
         "id": "USR-001",
         "username": "drperez",
+        "password": "medico2026",
         "rut": "11.111.111-1",
         "fullName": "Dr. Juan Pérez",
         "email": "juan.perez@cesfam.cl",
@@ -15,6 +18,7 @@ USERS = [
     {
         "id": "USR-002",
         "username": "mgonzalez",
+        "password": "farmacia2026",
         "rut": "22.222.222-2",
         "fullName": "María González",
         "email": "maria.gonzalez@cesfam.cl",
@@ -23,6 +27,7 @@ USERS = [
     {
         "id": "USR-003",
         "username": "dralopez",
+        "password": "medico2026",
         "rut": "13.555.444-8",
         "fullName": "Dra. Ana López",
         "email": "ana.lopez@cesfam.cl",
@@ -37,7 +42,8 @@ def seed() -> None:
         if db.execute(select(User.id).limit(1)).first() is not None:
             return
         for u in USERS:
-            db.add(User(**u))
+            data = {k: v for k, v in u.items() if k != "password"}
+            db.add(User(**data, passwordHash=hash_password(u["password"])))
         db.commit()
     finally:
         db.close()

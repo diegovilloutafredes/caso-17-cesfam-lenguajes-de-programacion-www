@@ -5,7 +5,8 @@
 # y los servicios arriba.
 set -uo pipefail
 G="${GATEWAY_URL:-http://localhost:8000}"
-TOK="sandbox-token-USR-001"
+TOK="sandbox-token-USR-001"        # doctor: emite la receta
+TOK_FARM="sandbox-token-USR-002"   # farmacia: prepara (rol exigido por el backend)
 fail=0
 ok() { echo "  ✓ $1"; }
 ko() { echo "  ✗ $1"; fail=1; }
@@ -20,7 +21,7 @@ echo "2) detener InventoryService"
 docker stop cesfam_inventory >/dev/null
 
 echo "3) prepare con inventory caído debe fallar con error claro (no colgar)"
-RESP=$(curl -s -m 12 -X POST "$G/api/v1/prescriptions/$RID/prepare" -H "Authorization: Bearer $TOK")
+RESP=$(curl -s -m 12 -X POST "$G/api/v1/prescriptions/$RID/prepare" -H "Authorization: Bearer $TOK_FARM")
 CODE=$(echo "$RESP" | python3 -c "import sys,json;print((json.load(sys.stdin).get('error') or {}).get('code','NONE'))" 2>/dev/null)
 case "$CODE" in
   INVENTORY_SERVICE_ERROR|CONNECTION_REFUSED|CIRCUIT_OPEN|TIMEOUT) ok "falla acotada ($CODE)";;
@@ -32,9 +33,9 @@ PAT=$(curl -s -m 5 -o /dev/null -w "%{http_code}" "$G/api/v1/patients?limit=2" -
 [ "$PAT" = "200" ] && ok "pacientes responde 200" || ko "pacientes responde $PAT"
 
 echo "5) Circuit Breaker abre tras varios fallos (fail-fast por latencia)"
-T1=$(curl -s -m 12 -o /dev/null -w "%{time_total}" -X POST "$G/api/v1/prescriptions/$RID/prepare" -H "Authorization: Bearer $TOK")
-for _ in 1 2 3 4 5 6; do curl -s -m 12 -o /dev/null -X POST "$G/api/v1/prescriptions/$RID/prepare" -H "Authorization: Bearer $TOK"; done
-T2=$(curl -s -m 12 -o /dev/null -w "%{time_total}" -X POST "$G/api/v1/prescriptions/$RID/prepare" -H "Authorization: Bearer $TOK")
+T1=$(curl -s -m 12 -o /dev/null -w "%{time_total}" -X POST "$G/api/v1/prescriptions/$RID/prepare" -H "Authorization: Bearer $TOK_FARM")
+for _ in 1 2 3 4 5 6; do curl -s -m 12 -o /dev/null -X POST "$G/api/v1/prescriptions/$RID/prepare" -H "Authorization: Bearer $TOK_FARM"; done
+T2=$(curl -s -m 12 -o /dev/null -w "%{time_total}" -X POST "$G/api/v1/prescriptions/$RID/prepare" -H "Authorization: Bearer $TOK_FARM")
 echo "   latencia con CB cerrado (reintentos): ${T1}s | con CB abierto (fail-fast): ${T2}s"
 python3 -c "import sys; sys.exit(0 if float('$T2') < float('$T1') else 1)" && ok "el breaker abrió (fail-fast más rápido)" || ko "no se observó fail-fast"
 

@@ -52,16 +52,19 @@ def write_off(
             "code": "INSUFFICIENT_STOCK",
             "message": f"La baja ({body.quantity}) excede el disponible ({med.availableQuantity})",
         })
-    # discard solo cambia el status del registro; el descuento es el mismo
+    # la baja siempre sale del disponible; el físico solo baja al desechar,
+    # mientras tanto las unidades quedan aisladas (RF4)
     batch.availableQuantity -= body.quantity
     if med:
         med.availableQuantity -= body.quantity
-        med.physicalQuantity -= body.quantity
+        if body.discard:
+            med.physicalQuantity -= body.quantity
+        else:
+            med.isolatedQuantity += body.quantity
 
     today = date.today()
-    wof_id = next_id(db, WriteOff.id, "WOF-")
-    db.add(WriteOff(
-        id=wof_id,
+    record = WriteOff(
+        id=next_id(db, WriteOff.id, "WOF-"),
         batchId=batch_id,
         medicationId=batch.medicationId,
         staffId=user["id"],
@@ -71,6 +74,14 @@ def write_off(
         expiredAt=today.isoformat(),
         discardDate=today.isoformat() if body.discard else None,
         notes=body.notes,
-    ))
+    )
+    db.add(record)
     db.commit()
-    return ok(_serialize_batch(batch))
+    return ok({
+        "id": record.id,
+        "batchId": record.batchId,
+        "medicationId": record.medicationId,
+        "status": record.status,
+        "quantity": record.quantity,
+        "batch": _serialize_batch(batch),
+    })

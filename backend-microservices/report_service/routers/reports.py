@@ -68,6 +68,11 @@ def generate_report(
         resp = _check(prescription_client.list_by_status("RESERVED,READY_FOR_PICKUP", token=token))
         prescriptions = (resp.get("data") or {}).get("data") or []
         for r in prescriptions:
+            emitted = r.get("emissionDate", "")
+            if body.dateFrom and emitted < body.dateFrom.isoformat():
+                continue
+            if body.dateTo and emitted > body.dateTo.isoformat():
+                continue
             for item in r.get("items", []):
                 rows.append([
                     r["id"], r["patientId"], item["medicationId"],

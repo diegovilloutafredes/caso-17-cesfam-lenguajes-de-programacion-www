@@ -1,8 +1,10 @@
-import { Doughnut, Bar } from 'react-chartjs-2'
+import { Doughnut, Bar, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
   ArcElement,
   BarElement,
+  LineElement,
+  PointElement,
   CategoryScale,
   LinearScale,
   Tooltip,
@@ -12,6 +14,8 @@ import {
 ChartJS.register(
   ArcElement,
   BarElement,
+  LineElement,
+  PointElement,
   CategoryScale,
   LinearScale,
   Tooltip,
@@ -35,7 +39,7 @@ export const baseOptions = {
   plugins: { legend: { labels: { font: { family: 'Inter' } } } },
 }
 
-export { Doughnut, Bar }
+export { Doughnut, Bar, Line }
 
 export function ChartCard({ title, subtitle, children, actions }) {
   return (

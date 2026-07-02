@@ -11,6 +11,7 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)            # "USR-001"
     username: Mapped[str] = mapped_column(String, unique=True, index=True)
+    passwordHash: Mapped[str] = mapped_column(String)  # "salt$pbkdf2"; nunca sale en to_dict
     rut: Mapped[str] = mapped_column(String)
     fullName: Mapped[str] = mapped_column(String)
     email: Mapped[Optional[str]] = mapped_column(String, nullable=True)

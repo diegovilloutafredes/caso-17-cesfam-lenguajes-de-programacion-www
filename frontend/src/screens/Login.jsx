@@ -14,17 +14,18 @@ export default function Login() {
     return <Navigate to={sessionUser?.role === 'doctor' ? '/medico' : '/farmacia'} replace />
   }
 
-  async function submit(e, presetUser) {
+  async function submit(e, presetUser, presetPassword) {
     if (e?.preventDefault) e.preventDefault()
     const u = presetUser || username
-    if (!u) {
-      setError('Ingresa tu usuario.')
+    const p = presetPassword || password
+    if (!u || !p) {
+      setError('Ingresa tu usuario y contraseña.')
       return
     }
     setLoading(true)
     setError('')
     try {
-      const user = await login(u, password || 'x')
+      const user = await login(u, p)
       navigate(user.role === 'doctor' ? '/medico' : '/farmacia', { replace: true })
     } catch (err) {
       setError(err.message || 'No se pudo iniciar sesión.')
@@ -89,17 +90,20 @@ export default function Login() {
           </div>
           <div className="role-btns">
             <button type="button" className="btn btn-outline" disabled={loading}
-              onClick={(e) => submit(e, 'drperez')}>
+              onClick={(e) => submit(e, 'drperez', 'medico2026')}>
               Ingresar como Médico
             </button>
             <button type="button" className="btn btn-outline" disabled={loading}
-              onClick={(e) => submit(e, 'mgonzalez')}>
+              onClick={(e) => submit(e, 'mgonzalez', 'farmacia2026')}>
               Ingresar como Funcionario
             </button>
           </div>
         </form>
 
-        <footer>© 2026 CESFAM — Sistema de Salud</footer>
+        <footer>
+          Demo: drperez / medico2026 · mgonzalez / farmacia2026
+          <br />© 2026 CESFAM — Sistema de Salud
+        </footer>
       </section>
     </main>
   )

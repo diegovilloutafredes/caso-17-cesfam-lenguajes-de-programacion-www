@@ -16,13 +16,13 @@ def client():
 
 @pytest.fixture(scope="session")
 def doctor_token(client):
-    r = client.post("/api/v1/auth/login", json={"username": "drperez", "password": "x"})
+    r = client.post("/api/v1/auth/login", json={"username": "drperez", "password": "medico2026"})
     return r.json()["data"]["token"]
 
 
 @pytest.fixture(scope="session")
 def pharmacy_token(client):
-    r = client.post("/api/v1/auth/login", json={"username": "mgonzalez", "password": "x"})
+    r = client.post("/api/v1/auth/login", json={"username": "mgonzalez", "password": "farmacia2026"})
     return r.json()["data"]["token"]
 
 

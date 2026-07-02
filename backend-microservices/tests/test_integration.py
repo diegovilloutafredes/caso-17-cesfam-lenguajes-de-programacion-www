@@ -24,9 +24,18 @@ def test_health(client):
 
 
 def test_login(client):
-    d = client.post("/api/v1/auth/login", json={"username": "drperez", "password": "x"}).json()["data"]
+    d = client.post("/api/v1/auth/login",
+                    json={"username": "drperez", "password": "medico2026"}).json()["data"]
     assert d["token"].startswith("sandbox-token-")
     assert d["user"]["role"] == "doctor"
+    assert "passwordHash" not in d["user"]
+
+
+def test_login_rejects_invalid_credentials(client):
+    r = client.post("/api/v1/auth/login", json={"username": "drperez", "password": "incorrecta"})
+    assert r.status_code == 401
+    r = client.post("/api/v1/auth/login", json={"username": "noexiste", "password": "medico2026"})
+    assert r.status_code == 401
 
 
 def test_doctor_dashboard(client, auth):
@@ -198,6 +207,61 @@ def test_deliver_rejects_foreign_guardian(client, auth, pharmacy_auth):
                 json={"reason": "limpieza"})
 
 
+def test_long_treatment_schedules_next_pickup_and_reminder(client, auth, pharmacy_auth):
+    """RF13: entregar un tratamiento largo agenda el próximo retiro; al estar por
+    vencer el plazo, el recordatorio sale por correo y SMS, una sola vez."""
+    r = client.post("/api/v1/prescriptions", headers=auth, json={
+        "patientId": "PAT-002", "treatmentType": "LONG", "durationDays": 2,
+        "pickupDeadline": "2026-07-20", "items": [_item("MED-0001", 4)],
+    })
+    rid = r.json()["data"]["id"]
+    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth)
+    delivered = client.post(
+        f"/api/v1/prescriptions/{rid}/deliver", headers=pharmacy_auth,
+        json={"pickerType": "patient", "batches": [{"batchId": "BCH-001", "quantity": 4}]},
+    ).json()["data"]
+    assert delivered["nextScheduledDelivery"] is not None
+
+    client.get("/api/v1/prescriptions?limit=1", headers=pharmacy_auth)  # gatilla el recordatorio
+    notas = client.get(f"/api/v1/notifications?prescriptionId={rid}", headers=pharmacy_auth).json()["data"]
+    reminders = [n for n in notas if n["event"] == "PICKUP_REMINDER"]
+    assert {n["type"] for n in reminders} == {"EMAIL", "SMS"}
+
+    client.get("/api/v1/prescriptions?limit=1", headers=pharmacy_auth)
+    notas = client.get(f"/api/v1/notifications?prescriptionId={rid}", headers=pharmacy_auth).json()["data"]
+    assert len([n for n in notas if n["event"] == "PICKUP_REMINDER"]) == len(reminders)
+
+
+def test_availability_notice_falls_back_to_guardian(client, auth, pharmacy_auth):
+    """RF11: sin contacto del paciente, el aviso va al apoderado por ambos canales."""
+    before = client.get("/api/v1/patients/PAT-004", headers=auth).json()["data"]
+    client.put("/api/v1/patients/PAT-004", headers=pharmacy_auth,
+               json={"email": None, "phone": None})
+    g = client.post("/api/v1/patients/PAT-004/guardians", headers=pharmacy_auth, json={
+        "rut": "16.288.404-2", "firstName": "Elena", "lastName": "Silva",
+        "relationship": "Hija", "phone": "+56 9 3333 2222", "email": "elena.silva@correo.cl",
+    }).json()["data"]
+
+    r = client.post("/api/v1/prescriptions", headers=auth, json={
+        "patientId": "PAT-004", "treatmentType": "SHORT", "durationDays": 7,
+        "pickupDeadline": "2026-07-20", "items": [_item("MED-0001", 2)],
+    })
+    rid = r.json()["data"]["id"]
+    client.post(f"/api/v1/prescriptions/{rid}/reserve", headers=pharmacy_auth)
+    client.post(f"/api/v1/prescriptions/{rid}/mark-available", headers=pharmacy_auth)
+
+    notas = client.get(f"/api/v1/notifications?prescriptionId={rid}", headers=pharmacy_auth).json()["data"]
+    avail = [n for n in notas if n["event"] == "RESERVATION_AVAILABLE"]
+    assert {n["type"] for n in avail} == {"EMAIL", "SMS"}
+    assert all(n["recipientGuardianId"] == g["id"] for n in avail)
+
+    client.post(f"/api/v1/prescriptions/{rid}/cancel", headers=pharmacy_auth,
+                json={"reason": "limpieza"})
+    client.delete(f"/api/v1/patients/PAT-004/guardians/{g['id']}", headers=pharmacy_auth)
+    client.put("/api/v1/patients/PAT-004", headers=pharmacy_auth,
+               json={"email": before["email"], "phone": before["phone"]})
+
+
 def test_consume_rejects_expired_batch(client, pharmacy_auth):
     """No se entrega desde una partida vencida (BCH-003 venció en junio 2026)."""
     r = client.post(
@@ -251,18 +315,31 @@ def test_reserved_matches_ready_prescriptions(client, auth):
         assert m["stock"]["reservedQuantity"] == expected.get(m["id"], 0), m["id"]
 
 
-def test_write_off_preserves_invariant(client, auth, pharmacy_auth):
-    """Una baja retira físico: mantiene physical = available + reserved."""
+def test_write_off_isolates_until_discard(client, auth, pharmacy_auth):
+    """Caducar descuenta el disponible y aísla; el físico baja recién al desechar."""
     before = _stock(client, auth, "MED-0007")
     r = client.post(
         "/api/v1/batches/BCH-006/write-off", headers=pharmacy_auth,
         json={"reason": "DAMAGED", "quantity": 5, "discard": False, "notes": "prueba"},
     )
     assert r.status_code == 200
+    wid = r.json()["data"]["id"]
+    mid = _stock(client, auth, "MED-0007")
+    assert mid["availableQuantity"] == before["availableQuantity"] - 5
+    assert mid["isolatedQuantity"] == before["isolatedQuantity"] + 5
+    assert mid["physicalQuantity"] == before["physicalQuantity"]
+
+    r = client.post(f"/api/v1/write-offs/{wid}/discard", headers=pharmacy_auth)
+    assert r.status_code == 200
+    r = client.post(f"/api/v1/write-offs/{wid}/discard", headers=pharmacy_auth)
+    assert r.status_code == 409  # no se desecha dos veces
+
     after = _stock(client, auth, "MED-0007")
+    assert after["isolatedQuantity"] == before["isolatedQuantity"]
     assert after["physicalQuantity"] == before["physicalQuantity"] - 5
-    assert after["availableQuantity"] == before["availableQuantity"] - 5
-    assert after["physicalQuantity"] == after["availableQuantity"] + after["reservedQuantity"]
+    assert after["physicalQuantity"] == (
+        after["availableQuantity"] + after["reservedQuantity"] + after["isolatedQuantity"]
+    )
 
 
 def test_deliver_requires_full_quantity(client, auth, pharmacy_auth):
