@@ -1,16 +1,16 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from patient_service.clients.prescription import PrescriptionServiceClient
 from patient_service.db import get_session
 from patient_service.models import Guardian, Patient
 from patient_service.schemas import GuardianCreate, PatientUpdate
-from patient_service.seed import next_id
 from shared.auth import current_token, current_user
 from shared.envelope import created, ok
+from shared.ids import next_id
 
 prescription_client = PrescriptionServiceClient()
 
@@ -67,21 +67,21 @@ def list_patients(
     _: dict = Depends(current_user),
     db: Session = Depends(get_session),
 ):
-    items = list(db.execute(select(Patient)).scalars().all())
+    stmt = select(Patient)
     if search:
-        q = search.lower()
-        items = [
-            p for p in items
-            if q in p.firstName.lower()
-            or q in p.lastName.lower()
-            or q in p.rut
-        ]
-    items = sorted(items, key=lambda p: (p.lastName, p.firstName))
-    total = len(items)
-    start = max(0, (page - 1) * limit)
-    page_items = items[start : start + limit]
+        like = f"%{search}%"
+        stmt = stmt.where(or_(
+            Patient.firstName.ilike(like),
+            Patient.lastName.ilike(like),
+            Patient.rut.ilike(like),
+        ))
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    rows = db.execute(
+        stmt.order_by(Patient.lastName, Patient.firstName)
+        .offset(max(0, (page - 1) * limit)).limit(limit)
+    ).scalars().all()
     return ok({
-        "data": [_serialize_patient(p) for p in page_items],
+        "data": [_serialize_patient(p) for p in rows],
         "pagination": {
             "page": page, "limit": limit, "total": total,
             "totalPages": (total + limit - 1) // limit if total else 0,
@@ -95,8 +95,9 @@ def recent_patients(
     _: dict = Depends(current_user),
     db: Session = Depends(get_session),
 ):
-    items = list(db.execute(select(Patient)).scalars().all())
-    items = sorted(items, key=lambda p: p.id, reverse=True)[:limit]
+    items = db.execute(
+        select(Patient).order_by(Patient.id.desc()).limit(limit)
+    ).scalars().all()
     return ok([
         {"id": p.id, "rut": p.rut, "firstName": p.firstName, "lastName": p.lastName}
         for p in items
@@ -183,7 +184,7 @@ def add_guardian(
 ):
     if not db.get(Patient, patient_id):
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Paciente no encontrado"})
-    new_id = next_id(db, "GRD")
+    new_id = next_id(db, Guardian.id, "GRD-")
     payload = body.model_dump(mode="json")
     g = Guardian(
         id=new_id,

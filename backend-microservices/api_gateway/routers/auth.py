@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api_gateway.clients.identity import IdentityServiceClient
@@ -16,4 +17,9 @@ class LoginBody(BaseModel):
 @router.post("/login")
 def login(body: LoginBody):
     """Login passthrough — el gateway delega en IdentityService."""
-    return identity_client.login(body.username, body.password)
+    response = identity_client.login(body.username, body.password)
+    if response.get("error"):
+        return JSONResponse(
+            status_code=response.get("statusCode", 502), content=response,
+        )
+    return response

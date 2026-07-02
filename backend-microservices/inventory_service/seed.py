@@ -230,27 +230,6 @@ _WRITE_OFFS = [
     },
 ]
 
-# Mapea cada prefijo de ID a su columna PK para el cálculo de next_id desde la BD.
-_ID_SOURCES = {
-    "MED": Medication.id,
-    "BCH": Batch.id,
-    "WOF": WriteOff.id,
-}
-
-
-def next_id(db: Session, prefix: str) -> str:
-    """Próximo ID `<prefix>-NNN` calculado desde el MAX del sufijo numérico en la BD."""
-    column = _ID_SOURCES[prefix]
-    rows = db.execute(select(column).where(column.like(f"{prefix}-%"))).scalars().all()
-    existing = [
-        int(value.split("-")[-1])
-        for value in rows
-        if isinstance(value, str) and value.split("-")[-1].isdigit()
-    ]
-    nxt = max(existing) + 1 if existing else 1
-    return f"{prefix}-{nxt:03d}"
-
-
 def seed() -> None:
     """Inserta el seed solo si las tablas están vacías (idempotente)."""
     db: Session = SessionLocal()

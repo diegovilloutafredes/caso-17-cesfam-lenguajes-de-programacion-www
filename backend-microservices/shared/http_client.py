@@ -109,12 +109,18 @@ class ServiceClient:
         url = f"{self.base_url}{path}"
         headers = {"Authorization": f"Bearer {token}"} if token else {}
 
+        # Un POST que expiró por timeout pudo haberse aplicado igual en el destino:
+        # reintentarlo lo duplicaría. Solo se reintenta lo que nunca llegó a enviarse.
+        retry_on = (
+            (httpx.TransportError,)
+            if method == "GET"
+            else (httpx.ConnectError, httpx.ConnectTimeout)
+        )
+
         @retry(
             stop=stop_after_attempt(3),
             wait=wait_exponential(multiplier=0.2, max=2),
-            retry=retry_if_exception_type(
-                (httpx.HTTPError, httpx.TimeoutException, httpx.ConnectError)
-            ),
+            retry=retry_if_exception_type(retry_on),
             reraise=True,
         )
         def do_request():

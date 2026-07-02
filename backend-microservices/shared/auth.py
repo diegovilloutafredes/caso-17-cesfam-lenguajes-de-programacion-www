@@ -84,3 +84,17 @@ def current_token(
             detail={"code": "UNAUTHORIZED", "message": "Falta token Bearer"},
         )
     return creds.credentials
+
+
+def require_role(*roles: str):
+    def dependency(user: dict = Depends(current_user)) -> dict:
+        if user["role"] not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "FORBIDDEN",
+                    "message": "El rol del usuario no permite esta operación",
+                },
+            )
+        return user
+    return dependency

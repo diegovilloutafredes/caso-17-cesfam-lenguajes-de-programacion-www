@@ -28,9 +28,9 @@ class InventoryServiceClient(ServiceClient):
             json={"quantity": quantity},
         )
 
-    def consume(self, allocations: List[dict], token: str) -> dict:
+    def consume(self, allocations: List[dict], expected_items: List[dict], token: str) -> dict:
         return self.post(
             "/api/v1/medications/consume",
             token=token,
-            json={"allocations": allocations},
+            json={"allocations": allocations, "expectedItems": expected_items},
         )

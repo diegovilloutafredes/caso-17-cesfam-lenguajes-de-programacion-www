@@ -2,7 +2,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_service.db import get_session
@@ -40,23 +40,24 @@ def list_write_offs(
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    items = [_serialize_write_off(w) for w in db.execute(select(WriteOff)).scalars().all()]
+    stmt = select(WriteOff)
     if medicationId:
-        items = [w for w in items if w["medicationId"] == medicationId]
+        stmt = stmt.where(WriteOff.medicationId == medicationId)
     if batchId:
-        items = [w for w in items if w["batchId"] == batchId]
+        stmt = stmt.where(WriteOff.batchId == batchId)
     if status_filter:
-        wanted = {s.strip() for s in status_filter.split(",")}
-        items = [w for w in items if w["status"] in wanted]
+        stmt = stmt.where(WriteOff.status.in_({s.strip() for s in status_filter.split(",")}))
     if dateFrom:
-        items = [w for w in items if w["expiredAt"] >= dateFrom.isoformat()]
+        stmt = stmt.where(WriteOff.expiredAt >= dateFrom.isoformat())
     if dateTo:
-        items = [w for w in items if w["expiredAt"] <= dateTo.isoformat()]
-    items = sorted(items, key=lambda w: w["expiredAt"], reverse=True)
-    total = len(items)
-    start = max(0, (page - 1) * limit)
+        stmt = stmt.where(WriteOff.expiredAt <= dateTo.isoformat())
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    rows = db.execute(
+        stmt.order_by(WriteOff.expiredAt.desc())
+        .offset(max(0, (page - 1) * limit)).limit(limit)
+    ).scalars().all()
     return ok({
-        "data": items[start : start + limit],
+        "data": [_serialize_write_off(w) for w in rows],
         "pagination": {
             "page": page, "limit": limit, "total": total,
             "totalPages": (total + limit - 1) // limit if total else 0,

@@ -5,16 +5,6 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
-class PrescriptionStatus(str, Enum):
-    SUBMITTED = "SUBMITTED"
-    RESERVED = "RESERVED"
-    READY_FOR_PICKUP = "READY_FOR_PICKUP"
-    PICKED_UP = "PICKED_UP"
-    EXTERNAL_PURCHASE = "EXTERNAL_PURCHASE"
-    CANCELLED = "CANCELLED"
-    EXPIRED = "EXPIRED"
-
-
 class TreatmentType(str, Enum):
     SHORT = "SHORT"
     LONG = "LONG"
@@ -27,19 +17,6 @@ class PrescriptionItem(BaseModel):
     doseDescription: str
     durationDays: int = Field(gt=0)
     totalQuantity: int = Field(gt=0)
-
-
-class Prescription(BaseModel):
-    id: str
-    doctorId: str
-    patientId: str
-    emissionDate: date
-    pickupDeadline: date
-    treatmentType: TreatmentType
-    durationDays: int
-    status: PrescriptionStatus
-    nextScheduledDelivery: Optional[date] = None
-    items: List[PrescriptionItem] = []
 
 
 class PrescriptionCreate(BaseModel):

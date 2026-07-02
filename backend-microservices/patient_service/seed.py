@@ -8,24 +8,6 @@ from sqlalchemy.orm import Session
 from patient_service.db import SessionLocal
 from patient_service.models import Guardian, Patient
 
-_PREFIX_MODEL = {
-    "PAT": Patient,
-    "GRD": Guardian,
-}
-
-
-def next_id(db: Session, prefix: str) -> str:
-    """Próximo id `PREFIX-NNN` calculado desde el MAX del sufijo numérico en la BD."""
-    model = _PREFIX_MODEL[prefix]
-    rows = db.execute(select(model.id)).scalars().all()
-    existing = [
-        int(k.split("-")[-1])
-        for k in rows
-        if isinstance(k, str) and k.startswith(prefix + "-") and k.split("-")[-1].isdigit()
-    ]
-    start = max(existing) + 1 if existing else 1
-    return f"{prefix}-{start:03d}"
-
 
 def seed() -> None:
     db: Session = SessionLocal()

@@ -1,8 +1,10 @@
+import logging
 from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from prescription_service.clients.inventory import InventoryServiceClient
@@ -13,9 +15,11 @@ from prescription_service.models import Prescription, PrescriptionItem
 from prescription_service.schemas import (
     CancelRequest, DeliverRequest, ExternalPurchaseRequest, PrescriptionCreate,
 )
-from prescription_service.seed import next_id
-from shared.auth import current_token, current_user
+from shared.auth import current_token, current_user, require_role
 from shared.envelope import created, ok
+from shared.ids import next_id
+
+logger = logging.getLogger("prescription_service")
 
 router = APIRouter(prefix="/api/v1/prescriptions", tags=["Recetas"])
 
@@ -85,6 +89,39 @@ def _get_locked(db: Session, prescription_id: str) -> Optional[Prescription]:
     ).scalar_one_or_none()
 
 
+def _expire_overdue(db: Session, token: str) -> None:
+    """Pasa a EXPIRED las recetas activas con la fecha límite de retiro vencida.
+
+    La transición es única (no se reintenta): si una liberación de stock falla,
+    se registra la fuga en el log en vez de arriesgar una doble liberación.
+    """
+    today = date.today()
+    overdue = db.execute(
+        select(Prescription.id).where(
+            Prescription.status.in_(ACTIVE_STATES),
+            Prescription.pickupDeadline < today,
+        )
+    ).scalars().all()
+    for rid in overdue:
+        r = _get_locked(db, rid)
+        if not r or r.status not in ACTIVE_STATES or r.pickupDeadline >= today:
+            db.rollback()
+            continue
+        if r.status == "READY_FOR_PICKUP":
+            for item in r.items:
+                resp = inventory_client.release_stock(
+                    item.medicationId, item.totalQuantity, token=token,
+                )
+                if _has_error(resp):
+                    logger.error(
+                        "Expiración de %s: no se liberaron %s unidades de %s (%s)",
+                        rid, item.totalQuantity, item.medicationId,
+                        resp["error"].get("message"),
+                    )
+        r.status = "EXPIRED"
+        db.commit()
+
+
 @router.get("")
 def list_prescriptions(
     status_filter: Optional[str] = None,
@@ -92,19 +129,24 @@ def list_prescriptions(
     page: int = 1,
     limit: int = 20,
     _: dict = Depends(current_user),
+    token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    items = list(db.execute(select(Prescription)).scalars().all())
+    _expire_overdue(db, token)
+    stmt = select(Prescription)
     if status_filter:
-        wanted = {s.strip() for s in status_filter.split(",")}
-        items = [r for r in items if r.status in wanted]
+        stmt = stmt.where(
+            Prescription.status.in_({s.strip() for s in status_filter.split(",")})
+        )
     if patientId:
-        items = [r for r in items if r.patientId == patientId]
-    items = sorted(items, key=lambda r: r.emissionDate, reverse=True)
-    total = len(items)
-    start = max(0, (page - 1) * limit)
+        stmt = stmt.where(Prescription.patientId == patientId)
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    rows = db.execute(
+        stmt.order_by(Prescription.emissionDate.desc())
+        .offset(max(0, (page - 1) * limit)).limit(limit)
+    ).scalars().all()
     return ok({
-        "data": [_serialize(r) for r in items[start : start + limit]],
+        "data": [_serialize(r) for r in rows],
         "pagination": {
             "page": page, "limit": limit, "total": total,
             "totalPages": (total + limit - 1) // limit if total else 0,
@@ -113,12 +155,17 @@ def list_prescriptions(
 
 
 @router.get("/queue")
-def queue(_: dict = Depends(current_user), db: Session = Depends(get_session)):
-    items = [
-        r for r in db.execute(select(Prescription)).scalars().all()
-        if r.status in {"SUBMITTED", "RESERVED"}
-    ]
-    items = sorted(items, key=lambda r: r.emissionDate)
+def queue(
+    _: dict = Depends(current_user),
+    token: str = Depends(current_token),
+    db: Session = Depends(get_session),
+):
+    _expire_overdue(db, token)
+    items = db.execute(
+        select(Prescription)
+        .where(Prescription.status.in_(["SUBMITTED", "RESERVED"]))
+        .order_by(Prescription.emissionDate)
+    ).scalars().all()
     return ok([_serialize(r) for r in items])
 
 
@@ -137,7 +184,7 @@ def get_prescription(
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_prescription(
     body: PrescriptionCreate,
-    user: dict = Depends(current_user),
+    user: dict = Depends(require_role("doctor")),
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
@@ -156,38 +203,57 @@ def create_prescription(
             "message": err.get("message", "Error consultando paciente"),
         })
 
-    new_id = next_id(db, "R")
-    rec = Prescription(
-        id=new_id,
-        doctorId=user["id"],
-        patientId=body.patientId,
-        emissionDate=date.today(),
-        pickupDeadline=body.pickupDeadline,
-        treatmentType=body.treatmentType.value,
-        durationDays=body.durationDays,
-        status="SUBMITTED",
-        nextScheduledDelivery=None,
-        items=[
-            PrescriptionItem(
-                medicationId=i.medicationId,
-                dosesPerInterval=i.dosesPerInterval,
-                intervalHours=i.intervalHours,
-                doseDescription=i.doseDescription,
-                durationDays=i.durationDays,
-                totalQuantity=i.totalQuantity,
+    # dos creaciones concurrentes pueden calcular el mismo ID; se reintenta
+    for _ in range(3):
+        rec = Prescription(
+            id=next_id(db, Prescription.id, "R", start=100),
+            doctorId=user["id"],
+            patientId=body.patientId,
+            emissionDate=date.today(),
+            pickupDeadline=body.pickupDeadline,
+            treatmentType=body.treatmentType.value,
+            durationDays=body.durationDays,
+            status="SUBMITTED",
+            nextScheduledDelivery=None,
+            items=[
+                PrescriptionItem(
+                    medicationId=i.medicationId,
+                    dosesPerInterval=i.dosesPerInterval,
+                    intervalHours=i.intervalHours,
+                    doseDescription=i.doseDescription,
+                    durationDays=i.durationDays,
+                    totalQuantity=i.totalQuantity,
+                )
+                for i in body.items
+            ],
+        )
+        db.add(rec)
+        try:
+            db.commit()
+            return created(_serialize(rec))
+        except IntegrityError:
+            db.rollback()
+    raise HTTPException(409, detail={
+        "code": "CONFLICT",
+        "message": "No se pudo asignar un ID de receta; reintenta la operación",
+    })
+
+
+def _release_reserved(reserved: list, prescription_id: str, token: str) -> None:
+    """Compensación: libera las reservas ya aplicadas; una falla se registra en el log."""
+    for med_id, qty in reserved:
+        release = inventory_client.release_stock(med_id, qty, token=token)
+        if _has_error(release):
+            logger.error(
+                "Compensación fallida en %s: %s unidades de %s quedaron reservadas (%s)",
+                prescription_id, qty, med_id, release["error"].get("message"),
             )
-            for i in body.items
-        ],
-    )
-    db.add(rec)
-    db.commit()
-    return created(_serialize(rec))
 
 
 @router.post("/{prescription_id}/prepare")
 def prepare(
     prescription_id: str,
-    user: dict = Depends(current_user),
+    user: dict = Depends(require_role("pharmacy_staff")),
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
@@ -204,9 +270,7 @@ def prepare(
             item.medicationId, item.totalQuantity, token=token
         )
         if _has_error(response):
-            # Compensa: libera lo ya reservado
-            for med_id, qty in reserved:
-                inventory_client.release_stock(med_id, qty, token=token)
+            _release_reserved(reserved, prescription_id, token)
             err = response["error"]
             if err.get("code") == "INSUFFICIENT_STOCK":
                 raise HTTPException(409, detail={
@@ -228,7 +292,7 @@ def prepare(
 @router.post("/{prescription_id}/reserve")
 def reserve(
     prescription_id: str,
-    _: dict = Depends(current_user),
+    _: dict = Depends(require_role("pharmacy_staff")),
     db: Session = Depends(get_session),
 ):
     """SUBMITTED → RESERVED. Sin movimiento de stock (no hay disponible aún)."""
@@ -244,7 +308,7 @@ def reserve(
 @router.post("/{prescription_id}/mark-available")
 def mark_available(
     prescription_id: str,
-    user: dict = Depends(current_user),
+    user: dict = Depends(require_role("pharmacy_staff")),
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
@@ -260,8 +324,7 @@ def mark_available(
             item.medicationId, item.totalQuantity, token=token
         )
         if _has_error(response):
-            for med_id, qty in reserved:
-                inventory_client.release_stock(med_id, qty, token=token)
+            _release_reserved(reserved, prescription_id, token)
             err = response["error"]
             raise HTTPException(409, detail={
                 "code": err.get("code", "RESERVE_FAILED"),
@@ -295,7 +358,7 @@ def mark_available(
 @router.post("/{prescription_id}/external-purchase")
 def external_purchase(
     prescription_id: str, body: ExternalPurchaseRequest,
-    _: dict = Depends(current_user),
+    _: dict = Depends(require_role("pharmacy_staff")),
     db: Session = Depends(get_session),
 ):
     r = _get_locked(db, prescription_id)
@@ -311,7 +374,7 @@ def external_purchase(
 @router.post("/{prescription_id}/cancel")
 def cancel(
     prescription_id: str, body: CancelRequest,
-    _user: dict = Depends(current_user),
+    _user: dict = Depends(require_role("doctor", "pharmacy_staff")),
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
@@ -358,7 +421,7 @@ def cancel(
 @router.post("/{prescription_id}/deliver")
 def deliver(
     prescription_id: str, body: DeliverRequest,
-    _user: dict = Depends(current_user),
+    _user: dict = Depends(require_role("pharmacy_staff")),
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
@@ -368,9 +431,21 @@ def deliver(
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Receta no encontrada"})
     _ensure_status(r, {"READY_FOR_PICKUP"}, "deliver")
 
-    if body.pickerType == "guardian" and not body.guardianId:
-        raise HTTPException(400, detail={
-            "code": "INVALID_GUARDIAN", "message": "guardianId requerido"})
+    if body.pickerType == "guardian":
+        if not body.guardianId:
+            raise HTTPException(400, detail={
+                "code": "INVALID_GUARDIAN", "message": "guardianId requerido"})
+        g_resp = patient_client.list_guardians(r.patientId, token=token)
+        if _has_error(g_resp):
+            raise HTTPException(g_resp.get("statusCode", 503), detail={
+                "code": "PATIENT_SERVICE_ERROR",
+                "message": g_resp["error"].get("message", "Error consultando apoderados"),
+            })
+        if body.guardianId not in {g["id"] for g in (g_resp.get("data") or [])}:
+            raise HTTPException(400, detail={
+                "code": "INVALID_GUARDIAN",
+                "message": f"El apoderado {body.guardianId} no está autorizado para este paciente",
+            })
     if body.pickerType == "third_party" and (not body.thirdPartyRut or not body.thirdPartyName):
         raise HTTPException(400, detail={
             "code": "MISSING_THIRD_PARTY",
@@ -387,7 +462,9 @@ def deliver(
         })
 
     response = inventory_client.consume(
-        [b.model_dump() for b in body.batches], token=token,
+        [b.model_dump() for b in body.batches],
+        [{"medicationId": it.medicationId, "quantity": it.totalQuantity} for it in r.items],
+        token=token,
     )
     if _has_error(response):
         err = response["error"]

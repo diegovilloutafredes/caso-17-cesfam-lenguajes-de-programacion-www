@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from inventory_service.db import get_session
 from inventory_service.models import Batch, Medication, WriteOff
 from inventory_service.schemas import BatchWriteOff
-from inventory_service.seed import next_id
-from shared.auth import current_user
+from shared.auth import require_role
 from shared.envelope import ok
+from shared.ids import next_id
 
 router = APIRouter(prefix="/api/v1/batches", tags=["Partidas"])
 
@@ -31,7 +31,7 @@ def write_off(
     batch_id: str,
     body: BatchWriteOff,
     db: Session = Depends(get_session),
-    user: dict = Depends(current_user),
+    user: dict = Depends(require_role("pharmacy_staff")),
 ):
     """Da de baja unidades de una partida + persiste WriteOff con motivo, qty y staff."""
     batch = db.execute(
@@ -61,7 +61,7 @@ def write_off(
         med.physicalQuantity -= body.quantity
 
     today = date.today()
-    wof_id = next_id(db, "WOF")
+    wof_id = next_id(db, WriteOff.id, "WOF-")
     db.add(WriteOff(
         id=wof_id,
         batchId=batch_id,

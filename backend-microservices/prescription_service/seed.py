@@ -192,21 +192,3 @@ def seed() -> None:
         db.commit()
     finally:
         db.close()
-
-
-def next_id(db: Session, prefix: str) -> str:
-    """Próximo ID consultando el MAX del sufijo numérico en la BD.
-
-    Para R: el seed llega hasta R058 → próximo R059. Si no hay filas, parte en 100.
-    """
-    pattern = f"{prefix}%"
-    rows = db.execute(
-        select(Prescription.id).where(Prescription.id.like(pattern))
-    ).scalars().all()
-    existing = [
-        int(k[len(prefix):])
-        for k in rows
-        if k[len(prefix):].isdigit()
-    ]
-    nxt = (max(existing) + 1) if existing else 100
-    return f"{prefix}{nxt:03d}"

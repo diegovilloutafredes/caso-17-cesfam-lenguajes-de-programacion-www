@@ -9,9 +9,9 @@ from notification_service.db import get_session
 from notification_service.models import Notification
 from notification_service.providers import email_provider, sms_provider
 from notification_service.schemas import NotificationCreate, NotificationType
-from notification_service.seed import next_id
 from shared.auth import current_user
 from shared.envelope import created, ok
+from shared.ids import next_id
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["Notificaciones"])
 
@@ -48,7 +48,7 @@ def send_notification(
             body=body.message,
         )
 
-    new_id = next_id(db, "NTF")
+    new_id = next_id(db, Notification.id, "NTF-")
     record = Notification(
         id=new_id,
         type=body.type.value if hasattr(body.type, "value") else body.type,

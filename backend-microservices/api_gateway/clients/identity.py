@@ -15,6 +15,3 @@ class IdentityServiceClient(ServiceClient):
             "/api/v1/auth/login",
             json={"username": username, "password": password},
         )
-
-    def me(self, token: str) -> dict:
-        return self.get("/api/v1/auth/me", token=token)

@@ -2,7 +2,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_service.db import get_session
@@ -10,9 +10,9 @@ from inventory_service.models import Batch, Medication
 from inventory_service.schemas import (
     BatchCreate, ConsumeRequest, StockReleaseRequest, StockReserveRequest,
 )
-from inventory_service.seed import next_id
-from shared.auth import current_user
+from shared.auth import current_user, require_role
 from shared.envelope import created, ok
+from shared.ids import next_id
 
 router = APIRouter(prefix="/api/v1/medications", tags=["Medicamentos"])
 
@@ -65,18 +65,20 @@ def list_medications(
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    meds = db.execute(select(Medication)).scalars().all()
-    items = [_serialize_med(m) for m in meds]
+    stmt = select(Medication)
     if search:
-        q = search.lower()
-        items = [m for m in items
-                 if q in m["description"].lower()
-                 or q in m["manufacturer"].lower()
-                 or q in m["code"].lower()]
-    total = len(items)
-    start = max(0, (page - 1) * limit)
+        like = f"%{search}%"
+        stmt = stmt.where(or_(
+            Medication.description.ilike(like),
+            Medication.manufacturer.ilike(like),
+            Medication.code.ilike(like),
+        ))
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    rows = db.execute(
+        stmt.order_by(Medication.id).offset(max(0, (page - 1) * limit)).limit(limit)
+    ).scalars().all()
     return ok({
-        "data": items[start : start + limit],
+        "data": [_serialize_med(m) for m in rows],
         "pagination": {
             "page": page, "limit": limit, "total": total,
             "totalPages": (total + limit - 1) // limit if total else 0,
@@ -152,14 +154,14 @@ def add_batch(
     medication_id: str,
     body: BatchCreate,
     db: Session = Depends(get_session),
-    _: dict = Depends(current_user),
+    _: dict = Depends(require_role("pharmacy_staff")),
 ):
     med = db.execute(
         select(Medication).where(Medication.id == medication_id).with_for_update()
     ).scalar_one_or_none()
     if not med:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Medicamento no encontrado"})
-    new_id = next_id(db, "BCH")
+    new_id = next_id(db, Batch.id, "BCH-")
     batch = Batch(
         id=new_id,
         medicationId=medication_id,
@@ -228,37 +230,72 @@ def consume_physical(
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    """Decrementa el físico por las partidas indicadas (al entregar).
-
-    Valida todas las partidas antes de mutar: si una no existe o no alcanza, falla
-    sin tocar ningún contador.
-    """
-    # Fase 1: validación previa, ningún side-effect aún
-    batches: dict[str, Batch] = {}
+    # valida todo antes de mutar, sobre cantidades agregadas por partida
+    today = date.today()
+    per_batch: dict[str, int] = {}
     for alloc in body.allocations:
+        per_batch[alloc.batchId] = per_batch.get(alloc.batchId, 0) + alloc.quantity
+
+    batches: dict[str, Batch] = {}
+    for batch_id in sorted(per_batch):
+        qty = per_batch[batch_id]
         batch = db.execute(
-            select(Batch).where(Batch.id == alloc.batchId).with_for_update()
+            select(Batch).where(Batch.id == batch_id).with_for_update()
         ).scalar_one_or_none()
         if batch is None:
             raise HTTPException(404, detail={
                 "code": "BATCH_NOT_FOUND",
-                "message": f"Partida no encontrada: {alloc.batchId}",
+                "message": f"Partida no encontrada: {batch_id}",
             })
-        if alloc.quantity > batch.availableQuantity:
+        if batch.expirationDate < today:
+            raise HTTPException(409, detail={
+                "code": "EXPIRED_BATCH",
+                "message": f"Partida {batch_id} vencida el {batch.expirationDate.isoformat()}",
+            })
+        if qty > batch.availableQuantity:
             raise HTTPException(409, detail={
                 "code": "INSUFFICIENT_BATCH",
-                "message": f"Partida {alloc.batchId}: {alloc.quantity} excede disponible ({batch.availableQuantity})",
+                "message": f"Partida {batch_id}: {qty} excede disponible ({batch.availableQuantity})",
             })
-        batches[alloc.batchId] = batch
-    # Fase 2: mutación — ya tenemos garantía de que todas las partidas existen
-    for alloc in body.allocations:
-        batch = batches[alloc.batchId]
+        batches[batch_id] = batch
+
+    per_med: dict[str, int] = {}
+    for batch_id, qty in per_batch.items():
+        med_id = batches[batch_id].medicationId
+        per_med[med_id] = per_med.get(med_id, 0) + qty
+
+    if body.expectedItems is not None:
+        expected: dict[str, int] = {}
+        for item in body.expectedItems:
+            expected[item.medicationId] = expected.get(item.medicationId, 0) + item.quantity
+        if per_med != expected:
+            raise HTTPException(409, detail={
+                "code": "ALLOCATION_MISMATCH",
+                "message": "Las partidas asignadas no corresponden a los medicamentos recetados",
+                "details": {"expected": expected, "provided": per_med},
+            })
+
+    meds: dict[str, Medication] = {}
+    for med_id in sorted(per_med):
         med = db.execute(
-            select(Medication).where(Medication.id == batch.medicationId).with_for_update()
+            select(Medication).where(Medication.id == med_id).with_for_update()
         ).scalar_one_or_none()
-        if med:
-            med.physicalQuantity -= alloc.quantity
-            med.reservedQuantity = max(0, med.reservedQuantity - alloc.quantity)
-        batch.availableQuantity = max(0, batch.availableQuantity - alloc.quantity)
+        if med is None:
+            raise HTTPException(404, detail={
+                "code": "NOT_FOUND",
+                "message": f"Medicamento no encontrado: {med_id}",
+            })
+        if per_med[med_id] > med.reservedQuantity:
+            raise HTTPException(409, detail={
+                "code": "INSUFFICIENT_RESERVED",
+                "message": f"{med_id}: el consumo ({per_med[med_id]}) excede lo reservado ({med.reservedQuantity})",
+            })
+        meds[med_id] = med
+
+    for batch_id, qty in per_batch.items():
+        batches[batch_id].availableQuantity -= qty
+    for med_id, qty in per_med.items():
+        meds[med_id].physicalQuantity -= qty
+        meds[med_id].reservedQuantity -= qty
     db.commit()
     return ok({"consumed": len(body.allocations)})

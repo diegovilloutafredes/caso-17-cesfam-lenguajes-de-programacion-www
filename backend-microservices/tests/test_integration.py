@@ -76,20 +76,20 @@ def test_medication_detail_via_proxy(client, auth):
 
 # --- Flujo feliz extremo a extremo -----------------------------------------
 
-def test_full_flow_create_prepare_deliver(client, auth):
+def test_full_flow_create_prepare_deliver(client, auth, pharmacy_auth):
     before = _stock(client, auth)
     r = _create(client, auth, [_item("MED-0001", 10)])
     assert r.json()["data"]["status"] == "SUBMITTED"
     rid = r.json()["data"]["id"]
 
-    prepared = client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=auth).json()["data"]
+    prepared = client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth).json()["data"]
     assert prepared["status"] == "READY_FOR_PICKUP"
     mid = _stock(client, auth)
     assert mid["availableQuantity"] == before["availableQuantity"] - 10
     assert mid["reservedQuantity"] == before["reservedQuantity"] + 10
 
     delivered = client.post(
-        f"/api/v1/prescriptions/{rid}/deliver", headers=auth,
+        f"/api/v1/prescriptions/{rid}/deliver", headers=pharmacy_auth,
         json={"pickerType": "patient", "batches": [{"batchId": "BCH-001", "quantity": 10}]},
     ).json()["data"]
     assert delivered["status"] == "PICKED_UP"
@@ -104,12 +104,12 @@ def test_create_with_unknown_patient(client, auth):
     assert err["code"] == "PATIENT_NOT_FOUND"
 
 
-def test_compensation_on_partial_prepare(client, auth):
+def test_compensation_on_partial_prepare(client, auth, pharmacy_auth):
     """Stock insuficiente en la 2ª línea: la 1ª (ya reservada) debe liberarse."""
     before = _stock(client, auth, "MED-0001")
     rid = _create(client, auth, [_item("MED-0001", 5), _item("MED-0003", 5)]).json()["data"]["id"]
 
-    err = client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=auth).json()["error"]
+    err = client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth).json()["error"]
     assert err["code"] == "INSUFFICIENT_STOCK"
     assert err["details"]["medicationId"] == "MED-0003"
 
@@ -119,10 +119,10 @@ def test_compensation_on_partial_prepare(client, auth):
     assert status == "SUBMITTED"
 
 
-def test_cancel_releases_reserved_stock(client, auth):
+def test_cancel_releases_reserved_stock(client, auth, pharmacy_auth):
     before = _stock(client, auth, "MED-0001")
     rid = _create(client, auth, [_item("MED-0001", 7)]).json()["data"]["id"]
-    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=auth)  # reserva 7
+    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth)  # reserva 7
     cancelled = client.post(
         f"/api/v1/prescriptions/{rid}/cancel", headers=auth, json={"reason": "prueba"},
     ).json()["data"]
@@ -131,19 +131,84 @@ def test_cancel_releases_reserved_stock(client, auth):
     assert after == before  # al cancelar desde READY_FOR_PICKUP se libera el stock
 
 
-def test_invalid_transition_deliver_submitted(client, auth):
+def test_invalid_transition_deliver_submitted(client, auth, pharmacy_auth):
     rid = _create(client, auth, [_item("MED-0001", 3)]).json()["data"]["id"]
     err = client.post(
-        f"/api/v1/prescriptions/{rid}/deliver", headers=auth,
+        f"/api/v1/prescriptions/{rid}/deliver", headers=pharmacy_auth,
         json={"pickerType": "patient", "batches": [{"batchId": "BCH-001", "quantity": 3}]},
     ).json()["error"]
     assert err["code"] == "INVALID_STATE"
 
 
-def test_reserve_insufficient_stock_direct(client, auth):
+def test_reserve_insufficient_stock_direct(client, auth, pharmacy_auth):
     rid = _create(client, auth, [_item("MED-0003", 5)]).json()["data"]["id"]
-    err = client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=auth).json()["error"]
+    err = client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth).json()["error"]
     assert err["code"] == "INSUFFICIENT_STOCK"
+
+
+def test_deliver_rejects_wrong_medication_batch(client, auth, pharmacy_auth):
+    """Las partidas entregadas deben ser del medicamento recetado."""
+    rid = _create(client, auth, [_item("MED-0001", 10)]).json()["data"]["id"]
+    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth)
+    err = client.post(
+        f"/api/v1/prescriptions/{rid}/deliver", headers=pharmacy_auth,
+        json={"pickerType": "patient", "batches": [{"batchId": "BCH-006", "quantity": 10}]},
+    ).json()["error"]  # BCH-006 es de MED-0007
+    assert err["code"] == "ALLOCATION_MISMATCH"
+    client.post(f"/api/v1/prescriptions/{rid}/cancel", headers=pharmacy_auth,
+                json={"reason": "limpieza"})
+
+
+def test_deliver_rejects_foreign_guardian(client, auth, pharmacy_auth):
+    """El apoderado debe pertenecer al paciente de la receta."""
+    rid = _create(client, auth, [_item("MED-0001", 4)]).json()["data"]["id"]
+    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth)
+    err = client.post(
+        f"/api/v1/prescriptions/{rid}/deliver", headers=pharmacy_auth,
+        json={"pickerType": "guardian", "guardianId": "GRD-999",
+              "batches": [{"batchId": "BCH-001", "quantity": 4}]},
+    ).json()["error"]
+    assert err["code"] == "INVALID_GUARDIAN"
+    client.post(f"/api/v1/prescriptions/{rid}/cancel", headers=pharmacy_auth,
+                json={"reason": "limpieza"})
+
+
+def test_consume_rejects_expired_batch(client, pharmacy_auth):
+    """No se entrega desde una partida vencida (BCH-003 venció en junio 2026)."""
+    r = client.post(
+        "/api/v1/medications/consume", headers=pharmacy_auth,
+        json={"allocations": [{"batchId": "BCH-003", "quantity": 1}]},
+    )
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "EXPIRED_BATCH"
+
+
+def test_consume_validates_aggregate_per_batch(client, pharmacy_auth):
+    """Dos asignaciones a la misma partida se validan por su suma, no por separado."""
+    batches = client.get(
+        "/api/v1/medications/MED-0007/batches", headers=pharmacy_auth,
+    ).json()["data"]
+    available = next(b["availableQuantity"] for b in batches if b["id"] == "BCH-006")
+    assert available > 0
+    r = client.post(
+        "/api/v1/medications/consume", headers=pharmacy_auth,
+        json={"allocations": [
+            {"batchId": "BCH-006", "quantity": available},
+            {"batchId": "BCH-006", "quantity": available},
+        ]},
+    )
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "INSUFFICIENT_BATCH"
+
+
+def test_role_enforcement(client, auth, pharmacy_auth):
+    """Farmacia no emite recetas; el médico no da de baja stock."""
+    assert _create(client, pharmacy_auth, [_item("MED-0001", 1)]).status_code == 403
+    r = client.post(
+        "/api/v1/batches/BCH-006/write-off", headers=auth,
+        json={"reason": "DAMAGED", "quantity": 1, "discard": False},
+    )
+    assert r.status_code == 403
 
 
 # --- Invariantes de inventario ----------------------------------------------
@@ -163,11 +228,11 @@ def test_reserved_matches_ready_prescriptions(client, auth):
         assert m["stock"]["reservedQuantity"] == expected.get(m["id"], 0), m["id"]
 
 
-def test_write_off_preserves_invariant(client, auth):
+def test_write_off_preserves_invariant(client, auth, pharmacy_auth):
     """Una baja retira físico: mantiene physical = available + reserved."""
     before = _stock(client, auth, "MED-0007")
     r = client.post(
-        "/api/v1/batches/BCH-006/write-off", headers=auth,
+        "/api/v1/batches/BCH-006/write-off", headers=pharmacy_auth,
         json={"reason": "DAMAGED", "quantity": 5, "discard": False, "notes": "prueba"},
     )
     assert r.status_code == 200
@@ -177,16 +242,16 @@ def test_write_off_preserves_invariant(client, auth):
     assert after["physicalQuantity"] == after["availableQuantity"] + after["reservedQuantity"]
 
 
-def test_deliver_requires_full_quantity(client, auth):
+def test_deliver_requires_full_quantity(client, auth, pharmacy_auth):
     """deliver exige que las partidas sumen lo recetado (entrega completa, no parcial)."""
     rid = _create(client, auth, [_item("MED-0001", 10)]).json()["data"]["id"]
-    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=auth)  # READY, reserva 10
+    client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth)  # READY, reserva 10
     err = client.post(
-        f"/api/v1/prescriptions/{rid}/deliver", headers=auth,
+        f"/api/v1/prescriptions/{rid}/deliver", headers=pharmacy_auth,
         json={"pickerType": "patient", "batches": [{"batchId": "BCH-001", "quantity": 7}]},
     ).json()["error"]
     assert err["code"] == "QUANTITY_MISMATCH"
-    client.post(f"/api/v1/prescriptions/{rid}/cancel", headers=auth, json={"reason": "limpieza"})
+    client.post(f"/api/v1/prescriptions/{rid}/cancel", headers=pharmacy_auth, json={"reason": "limpieza"})
 
 
 # --- Reportería C8 ----------------------------------------------------------

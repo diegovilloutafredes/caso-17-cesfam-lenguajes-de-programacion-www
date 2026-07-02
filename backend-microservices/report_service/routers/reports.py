@@ -4,7 +4,7 @@ from datetime import date
 from enum import Enum
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
@@ -39,12 +39,18 @@ def generate_report(
     """Genera informe CSV. Consulta InventoryService y PrescriptionService según tipo."""
     rows: list[list[str]] = []
 
+    def _check(resp: dict) -> dict:
+        if resp.get("error"):
+            raise HTTPException(resp.get("statusCode", 503), detail={
+                "code": "UPSTREAM_ERROR",
+                "message": resp["error"].get("message", "Servicio no disponible"),
+            })
+        return resp
+
     if body.reportType == ReportType.STOCK:
         rows.append(["code", "description", "manufacturer", "availableStock",
                      "reservedStock", "physicalStock", "minStock"])
-        resp = inventory_client.list_medications(token=token)
-        if resp.get("error"):
-            return f"ERROR: {resp['error'].get('message')}"
+        resp = _check(inventory_client.list_medications(token=token))
         meds = (resp.get("data") or {}).get("data") or []
         for m in meds:
             stock = m.get("stock", {})
@@ -60,9 +66,7 @@ def generate_report(
     elif body.reportType == ReportType.RESERVED:
         rows.append(["prescriptionId", "patientId", "medicationId",
                      "totalQuantity", "emissionDate", "status"])
-        resp = prescription_client.list_by_status("RESERVED,READY_FOR_PICKUP", token=token)
-        if resp.get("error"):
-            return f"ERROR: {resp['error'].get('message')}"
+        resp = _check(prescription_client.list_by_status("RESERVED,READY_FOR_PICKUP", token=token))
         prescriptions = (resp.get("data") or {}).get("data") or []
         for r in prescriptions:
             for item in r.get("items", []):
@@ -73,7 +77,7 @@ def generate_report(
 
     elif body.reportType == ReportType.EXPIRED:
         rows.append(["medicationId", "code", "batches"])
-        meds_resp = inventory_client.list_medications(token=token)
+        meds_resp = _check(inventory_client.list_medications(token=token))
         meds = (meds_resp.get("data") or {}).get("data") or []
         today = date.today().isoformat()
         for m in meds:

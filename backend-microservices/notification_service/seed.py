@@ -12,18 +12,6 @@ from .db import SessionLocal
 from .models import Notification
 
 
-def next_id(db, prefix: str) -> str:
-    """Próximo ID `PREFIX-NNN` calculando el MAX del sufijo numérico en la tabla."""
-    rows = db.execute(select(Notification.id)).scalars().all()
-    existing = [
-        int(k.split("-")[-1])
-        for k in rows
-        if isinstance(k, str) and k.startswith(prefix + "-") and k.split("-")[-1].isdigit()
-    ]
-    nxt = (max(existing) + 1) if existing else 1
-    return f"{prefix}-{nxt:03d}"
-
-
 def seed() -> None:
     db = SessionLocal()
     try:
