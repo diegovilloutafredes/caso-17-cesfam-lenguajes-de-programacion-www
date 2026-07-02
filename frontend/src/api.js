@@ -23,6 +23,12 @@ api.interceptors.response.use(
     return body
   },
   (error) => {
+    // sesión inválida: se limpia y se vuelve al login
+    if (error.response?.status === 401 && !error.config?.url?.includes('/api/v1/auth/login')) {
+      localStorage.removeItem('cesfam_token')
+      localStorage.removeItem('cesfam_user')
+      if (window.location.pathname !== '/login') window.location.assign('/login')
+    }
     const env = error.response?.data
     if (env && typeof env === 'object' && env.error) {
       const e = new Error(env.error.message || 'Error')
@@ -37,8 +43,6 @@ api.interceptors.response.use(
 
 export const authApi = {
   login: (username, password) => api.post('/api/v1/auth/login', { username, password }),
-  me: () => api.get('/api/v1/auth/me'),
-  logout: () => api.post('/api/v1/auth/logout'),
 }
 
 export const patientsApi = {

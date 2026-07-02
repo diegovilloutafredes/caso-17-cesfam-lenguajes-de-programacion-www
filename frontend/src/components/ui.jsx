@@ -25,6 +25,7 @@ export function SearchBar({ value, onChange, placeholder, style }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        aria-label={placeholder || 'Buscar'}
       />
     </div>
   )

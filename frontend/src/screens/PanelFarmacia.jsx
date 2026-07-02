@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { dashboardsApi, prescriptionsApi } from '../api'
+import { dashboardsApi, patientsApi, prescriptionsApi } from '../api'
 import Modal from '../components/Modal'
 import { Bar, Doughnut, ChartCard, CHART, baseOptions } from '../components/charts'
 import { Badge, Kpi, PageHeader, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
-import { prescriptionStatus, stockStatus } from '../lib/format'
+import { prescriptionStatus, stockStatus, fullName } from '../lib/format'
 import { allowedActions } from '../lib/prescriptionActions'
 
 const TOP_WINDOWS = [
@@ -23,6 +23,12 @@ export default function PanelFarmacia() {
   const [loading, setLoading] = useState(true)
   const [topMeds, setTopMeds] = useState([])
   const [topDays, setTopDays] = useState(90)
+  const topDaysRef = useRef(90) // ventana vigente para los refrescos de load()
+  const topReqRef = useRef(0)
+  const [busyId, setBusyId] = useState(null)
+
+  // La cola solo trae patientId; los nombres salen de este catálogo.
+  const [patientsById, setPatientsById] = useState({})
 
   // Modal "Sin stock" (al preparar una prescripción sin existencias).
   const [stockRx, setStockRx] = useState(null)
@@ -31,23 +37,23 @@ export default function PanelFarmacia() {
   const [cancelReason, setCancelReason] = useState('')
   const [stockSubmitting, setStockSubmitting] = useState(false)
 
-  // Modal "Confirmar retiro" (al entregar una prescripción disponible).
-  const [deliverRx, setDeliverRx] = useState(null)
-  const [pickerType, setPickerType] = useState('patient')
-  const [guardianId, setGuardianId] = useState('')
-  const [thirdPartyRut, setThirdPartyRut] = useState('')
-  const [thirdPartyName, setThirdPartyName] = useState('')
-  const [batchId, setBatchId] = useState('')
-  const [quantity, setQuantity] = useState('')
-  const [deliverSubmitting, setDeliverSubmitting] = useState(false)
+  async function fetchTop(days) {
+    const req = ++topReqRef.current
+    try {
+      const res = await dashboardsApi.pharmacyTopMedications(days)
+      if (topReqRef.current === req) setTopMeds(res.topMedications || [])
+    } catch (err) {
+      if (topReqRef.current === req) showToast('Error al cargar el top', err.message, 'danger')
+    }
+  }
 
   async function load() {
     setLoading(true)
     try {
       const d = await dashboardsApi.pharmacy()
       setData(d)
-      setTopMeds(d.topMedications || [])
-      setTopDays(90)
+      if (topDaysRef.current === 90) setTopMeds(d.topMedications || [])
+      else fetchTop(topDaysRef.current)
     } catch (err) {
       showToast('Error al cargar el panel', err.message, 'danger')
     } finally {
@@ -55,21 +61,36 @@ export default function PanelFarmacia() {
     }
   }
 
-  async function changeTopWindow(days) {
+  function changeTopWindow(days) {
+    topDaysRef.current = days
     setTopDays(days)
-    try {
-      const res = await dashboardsApi.pharmacyTopMedications(days)
-      setTopMeds(res.topMedications || [])
-    } catch (err) {
-      showToast('Error al cargar el top', err.message, 'danger')
-    }
+    fetchTop(days)
   }
 
   useEffect(() => {
     load()
+    let active = true
+    patientsApi
+      .list({ page: 1, limit: 100 })
+      .then((res) => {
+        if (active) setPatientsById(Object.fromEntries((res.data || []).map((p) => [p.id, p])))
+      })
+      .catch(() => {
+        /* sin catálogo la cola muestra el id */
+      })
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  function patientLabel(rx) {
+    const p = patientsById[rx.patientId]
+    return p ? fullName(p) : rx.patientId
+  }
+
   async function handlePrepare(rx) {
+    setBusyId(rx.id)
     try {
       await prescriptionsApi.prepare(rx.id)
       showToast('Prescripción preparada', `Prescripción ${rx.id} lista.`, 'success')
@@ -83,6 +104,8 @@ export default function PanelFarmacia() {
       } else {
         showToast('No se pudo preparar', err.message, 'danger')
       }
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -106,52 +129,6 @@ export default function PanelFarmacia() {
       showToast('No se pudo completar la acción', err.message, 'danger')
     } finally {
       setStockSubmitting(false)
-    }
-  }
-
-  function openDeliver(rx) {
-    setDeliverRx(rx)
-    setPickerType('patient')
-    setGuardianId('')
-    setThirdPartyRut('')
-    setThirdPartyName('')
-    setBatchId('')
-    setQuantity('')
-  }
-
-  async function submitDeliver() {
-    if (!deliverRx) return
-    if (!batchId || !(Number(quantity) > 0)) {
-      showToast('Datos incompletos', 'Indica el lote y una cantidad válida.', 'warning')
-      return
-    }
-    if (pickerType === 'guardian' && !guardianId) {
-      showToast('Datos incompletos', 'Selecciona el apoderado que retira.', 'warning')
-      return
-    }
-    if (pickerType === 'third_party' && (!thirdPartyRut || !thirdPartyName)) {
-      showToast('Datos incompletos', 'Indica el RUT y el nombre del tercero autorizado.', 'warning')
-      return
-    }
-    setDeliverSubmitting(true)
-    try {
-      const body = {
-        pickerType,
-        batches: [{ batchId, quantity: Number(quantity) }],
-      }
-      if (pickerType === 'guardian') body.guardianId = guardianId
-      if (pickerType === 'third_party') {
-        body.thirdPartyRut = thirdPartyRut
-        body.thirdPartyName = thirdPartyName
-      }
-      await prescriptionsApi.deliver(deliverRx.id, body)
-      showToast('Entrega registrada', `Prescripción ${deliverRx.id} retirada.`, 'success')
-      setDeliverRx(null)
-      await load()
-    } catch (err) {
-      showToast('No se pudo registrar la entrega', err.message, 'danger')
-    } finally {
-      setDeliverSubmitting(false)
     }
   }
 
@@ -220,6 +197,7 @@ export default function PanelFarmacia() {
                 <select
                   className="select"
                   style={{ width: 'auto' }}
+                  aria-label="Ventana de tiempo del top"
                   value={topDays}
                   onChange={(e) => changeTopWindow(Number(e.target.value))}
                 >
@@ -279,24 +257,20 @@ export default function PanelFarmacia() {
                   {queue.map((rx) => {
                     const st = prescriptionStatus(rx.status)
                     const acts = allowedActions(rx.status)
+                    const busy = busyId === rx.id
                     return (
                       <tr key={rx.id}>
                         <td>
                           <strong>{rx.id}</strong>
                         </td>
-                        <td>{rx.patientId}</td>
+                        <td>{patientLabel(rx)}</td>
                         <td>
                           <Badge type={st.badge}>{st.label}</Badge>
                         </td>
                         <td className="actions">
                           {acts.includes('prepare') && (
-                            <button className="btn btn-primary btn-sm" onClick={() => handlePrepare(rx)}>
+                            <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => handlePrepare(rx)}>
                               Preparar
-                            </button>
-                          )}
-                          {acts.includes('deliver') && (
-                            <button className="btn btn-success btn-sm" onClick={() => openDeliver(rx)}>
-                              Entregar
                             </button>
                           )}
                         </td>
@@ -327,8 +301,8 @@ export default function PanelFarmacia() {
           </>
         }
       >
-        <div className="chips" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-          <label className="row">
+        <div className="radio-list">
+          <label className="radio-row">
             <input
               type="radio"
               name="stockAction"
@@ -337,7 +311,7 @@ export default function PanelFarmacia() {
             />
             <span>Reservar prescripción</span>
           </label>
-          <label className="row">
+          <label className="radio-row">
             <input
               type="radio"
               name="stockAction"
@@ -346,7 +320,7 @@ export default function PanelFarmacia() {
             />
             <span>Compra externa</span>
           </label>
-          <label className="row">
+          <label className="radio-row">
             <input
               type="radio"
               name="stockAction"
@@ -382,117 +356,6 @@ export default function PanelFarmacia() {
             />
           </div>
         )}
-      </Modal>
-
-      {/* Modal: confirmar retiro */}
-      <Modal
-        open={!!deliverRx}
-        onClose={() => setDeliverRx(null)}
-        title="Confirmar retiro"
-        subtitle={deliverRx ? `Entrega de la prescripción ${deliverRx.id}.` : ''}
-        actions={
-          <>
-            <button className="btn btn-outline" onClick={() => setDeliverRx(null)} disabled={deliverSubmitting}>
-              Cancelar
-            </button>
-            <button className="btn btn-success" onClick={submitDeliver} disabled={deliverSubmitting}>
-              {deliverSubmitting ? 'Registrando…' : 'Confirmar entrega'}
-            </button>
-          </>
-        }
-      >
-        <div className="chips" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-          <label className="row">
-            <input
-              type="radio"
-              name="pickerType"
-              checked={pickerType === 'patient'}
-              onChange={() => setPickerType('patient')}
-            />
-            <span>Paciente</span>
-          </label>
-          <label className="row">
-            <input
-              type="radio"
-              name="pickerType"
-              checked={pickerType === 'guardian'}
-              onChange={() => setPickerType('guardian')}
-            />
-            <span>Apoderado</span>
-          </label>
-          <label className="row">
-            <input
-              type="radio"
-              name="pickerType"
-              checked={pickerType === 'third_party'}
-              onChange={() => setPickerType('third_party')}
-            />
-            <span>Tercero autorizado</span>
-          </label>
-        </div>
-
-        {pickerType === 'guardian' && (
-          <div className="input-group" style={{ marginTop: 12 }}>
-            <label htmlFor="guardianId">ID del apoderado</label>
-            <input
-              id="guardianId"
-              className="input"
-              value={guardianId}
-              onChange={(e) => setGuardianId(e.target.value)}
-              placeholder="ID del apoderado"
-            />
-          </div>
-        )}
-
-        {pickerType === 'third_party' && (
-          <>
-            <div className="input-group" style={{ marginTop: 12 }}>
-              <label htmlFor="thirdPartyRut">RUT del tercero</label>
-              <input
-                id="thirdPartyRut"
-                className="input"
-                value={thirdPartyRut}
-                onChange={(e) => setThirdPartyRut(e.target.value)}
-                placeholder="12.345.678-9"
-              />
-            </div>
-            <div className="input-group">
-              <label htmlFor="thirdPartyName">Nombre del tercero</label>
-              <input
-                id="thirdPartyName"
-                className="input"
-                value={thirdPartyName}
-                onChange={(e) => setThirdPartyName(e.target.value)}
-                placeholder="Nombre completo"
-              />
-            </div>
-          </>
-        )}
-
-        <div className="grid grid-2" style={{ marginTop: 12 }}>
-          <div className="input-group">
-            <label htmlFor="batchId">ID de lote</label>
-            <input
-              id="batchId"
-              className="input"
-              value={batchId}
-              onChange={(e) => setBatchId(e.target.value)}
-              placeholder="ID del lote"
-            />
-          </div>
-          <div className="input-group">
-            <label htmlFor="quantity">Cantidad</label>
-            <input
-              id="quantity"
-              className="input"
-              type="number"
-              min="1"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-        </div>
       </Modal>
     </>
   )

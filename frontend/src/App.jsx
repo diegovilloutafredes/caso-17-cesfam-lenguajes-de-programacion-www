@@ -23,11 +23,11 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/medico" element={<PanelMedico />} />
-            <Route path="/farmacia" element={<PanelFarmacia />} />
-            <Route path="/recetas" element={<Recetas />} />
-            <Route path="/buscar-paciente" element={<BuscarPaciente />} />
-            <Route path="/gestion-stock" element={<GestionStock />} />
+            <Route path="/medico" element={<ProtectedRoute role="doctor"><PanelMedico /></ProtectedRoute>} />
+            <Route path="/farmacia" element={<ProtectedRoute role="pharmacy_staff"><PanelFarmacia /></ProtectedRoute>} />
+            <Route path="/recetas" element={<ProtectedRoute role="pharmacy_staff"><Recetas /></ProtectedRoute>} />
+            <Route path="/buscar-paciente" element={<ProtectedRoute role="pharmacy_staff"><BuscarPaciente /></ProtectedRoute>} />
+            <Route path="/gestion-stock" element={<ProtectedRoute role="pharmacy_staff"><GestionStock /></ProtectedRoute>} />
           </Route>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { patientsApi } from '../api'
 import Modal from '../components/Modal'
 import ActivePrescriptionsList from '../components/ActivePrescriptionsList'
@@ -76,7 +76,12 @@ export default function BuscarPaciente() {
     setPage(1)
   }
 
+  // Invalida respuestas tardías: si se cerró el modal o se pidió otro paciente,
+  // la carga en vuelo se descarta en vez de reabrirlo.
+  const infoReqRef = useRef(0)
+
   async function openInfo(patientId) {
+    const req = ++infoReqRef.current
     setSelected(null)
     setHistory(null)
     setDetailLoading(true)
@@ -85,17 +90,20 @@ export default function BuscarPaciente() {
         patientsApi.get(patientId),
         patientsApi.history(patientId),
       ])
+      if (infoReqRef.current !== req) return
       setSelected(patient)
       setHistory(hist)
     } catch (err) {
+      if (infoReqRef.current !== req) return
       showToast('Error al cargar paciente', err.message, 'danger')
       setSelected(null)
     } finally {
-      setDetailLoading(false)
+      if (infoReqRef.current === req) setDetailLoading(false)
     }
   }
 
   function closeInfo() {
+    infoReqRef.current++
     setSelected(null)
     setHistory(null)
     setDetailLoading(false)

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { prescriptionsApi, inventoryApi } from '../api'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { inventoryApi, patientsApi, prescriptionsApi } from '../api'
+import DeliverModal from '../components/DeliverModal'
 import Modal from '../components/Modal'
 import { SearchBar, Badge, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
@@ -13,29 +14,10 @@ const CHIPS = [
   { key: 'RESERVED', label: 'Reservado', status: 'RESERVED' },
 ]
 
-// El paciente/medicamento pueden venir embebidos o como simple id según el backend.
-function patientLabel(r) {
-  if (r.patient) return fullName(r.patient)
-  return r.patientName || (r.patientId != null ? `Paciente ${r.patientId}` : '—')
-}
-
-function patientRut(r) {
-  return r.patient?.rut || r.patientRut || ''
-}
-
-function medicationLabel(r) {
-  const it = r.items?.[0]
-  if (!it) return '—'
-  return it.medicationDescription || it.description || it.medicationName ||
-    (it.medicationId != null ? `Medicamento ${it.medicationId}` : '—')
-}
-
 function totalQuantity(r) {
   if (!r.items?.length) return '—'
   return r.items.reduce((acc, it) => acc + (it.totalQuantity || 0), 0)
 }
-
-const EMPTY_PICKUP = { pickerType: 'patient', guardianId: '', thirdPartyRut: '', thirdPartyName: '', batchId: '', quantity: '' }
 
 export default function Recetas() {
   const { showToast } = useToast()
@@ -45,29 +27,70 @@ export default function Recetas() {
   const [search, setSearch] = useState('')
 
   const [busyId, setBusyId] = useState(null)
+  const [pickup, setPickup] = useState(null)
+  const [cancelRx, setCancelRx] = useState(null)
+  const [cancelReason, setCancelReason] = useState('')
 
-  // Estado del modal de retiro.
-  const [pickup, setPickup] = useState(null) // receta seleccionada
-  const [batches, setBatches] = useState([])
-  const [form, setForm] = useState(EMPTY_PICKUP)
-  const [delivering, setDelivering] = useState(false)
+  // La receta solo trae ids; los nombres salen de estos catálogos.
+  const [patientsById, setPatientsById] = useState({})
+  const [medsById, setMedsById] = useState({})
+
+  const loadReqRef = useRef(0)
+
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      patientsApi.list({ page: 1, limit: 100 }),
+      inventoryApi.listMedications({ page: 1, limit: 100 }),
+    ])
+      .then(([pats, meds]) => {
+        if (!active) return
+        setPatientsById(Object.fromEntries((pats.data || []).map((p) => [p.id, p])))
+        setMedsById(Object.fromEntries((meds.data || []).map((m) => [m.id, m])))
+      })
+      .catch(() => {
+        /* sin catálogos las filas muestran el id */
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   async function load(statusKey = chip) {
+    const req = ++loadReqRef.current
     setLoading(true)
     try {
       const status = CHIPS.find((c) => c.key === statusKey)?.status
       const res = await prescriptionsApi.list({ status_filter: status || undefined, limit: 100 })
+      if (loadReqRef.current !== req) return
       setPrescriptions(res.data || [])
     } catch (err) {
+      if (loadReqRef.current !== req) return
       showToast('Error al cargar recetas', err.message, 'danger')
     } finally {
-      setLoading(false)
+      if (loadReqRef.current === req) setLoading(false)
     }
   }
 
   useEffect(() => {
     load(chip)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chip])
+
+  function patientLabel(r) {
+    const p = patientsById[r.patientId]
+    return p ? fullName(p) : r.patientId ?? '—'
+  }
+
+  function patientRut(r) {
+    return patientsById[r.patientId]?.rut || ''
+  }
+
+  function medicationLabel(r) {
+    const it = r.items?.[0]
+    if (!it) return '—'
+    return medsById[it.medicationId]?.description || it.medicationId || '—'
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -78,7 +101,8 @@ export default function Recetas() {
         .toLowerCase()
       return hay.includes(q)
     })
-  }, [prescriptions, search])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prescriptions, search, patientsById, medsById])
 
   async function runAction(id, fn, okTitle) {
     setBusyId(id)
@@ -93,78 +117,20 @@ export default function Recetas() {
     }
   }
 
-  async function openPickup(r) {
-    setPickup(r)
-    setForm(EMPTY_PICKUP)
-    setBatches([])
-    const item = r.items?.[0]
-    if (item?.medicationId == null) return
-    const required = r.items.reduce((acc, it) => acc + (it.totalQuantity || 0), 0)
-    try {
-      const med = await inventoryApi.getMedication(item.medicationId)
-      const list = (med.batches || []).filter((b) => (b.availableQuantity || 0) > 0)
-      setBatches(list)
-      // La entrega es completa: prellena la cantidad recetada y un lote con stock suficiente.
-      const batch = list.find((b) => b.availableQuantity >= required) || list[0]
-      setForm((f) => ({
-        ...f,
-        quantity: String(required),
-        batchId: batch ? String(batch.id) : '',
-      }))
-    } catch (err) {
-      showToast('Error al cargar partidas', err.message, 'danger')
-    }
+  function openCancel(r) {
+    setCancelReason('')
+    setCancelRx(r)
   }
 
-  function closePickup() {
-    setPickup(null)
-    setBatches([])
-    setForm(EMPTY_PICKUP)
-  }
-
-  async function submitPickup() {
-    if (!form.batchId) {
-      showToast('Falta la partida', 'Seleccione una partida a entregar.', 'warning')
+  async function submitCancel() {
+    if (!cancelReason.trim()) {
+      showToast('Falta el motivo', 'Indica el motivo de la anulación.', 'warning')
       return
     }
-    const qty = Number(form.quantity)
-    if (!qty || qty <= 0) {
-      showToast('Cantidad inválida', 'Ingrese la cantidad a entregar.', 'warning')
-      return
-    }
-    const body = {
-      pickerType: form.pickerType === 'third-party' ? 'third_party' : form.pickerType,
-      batches: [{ batchId: form.batchId, quantity: qty }],
-    }
-    if (form.pickerType === 'guardian') {
-      if (!form.guardianId) {
-        showToast('Falta el apoderado', 'Seleccione un apoderado autorizado.', 'warning')
-        return
-      }
-      body.guardianId = form.guardianId
-    }
-    if (form.pickerType === 'third-party') {
-      if (!form.thirdPartyRut || !form.thirdPartyName) {
-        showToast('Datos del tercero incompletos', 'Ingrese RUT y nombre del tercero.', 'warning')
-        return
-      }
-      body.thirdPartyRut = form.thirdPartyRut
-      body.thirdPartyName = form.thirdPartyName
-    }
-    setDelivering(true)
-    try {
-      await prescriptionsApi.deliver(pickup.id, body)
-      showToast('Retiro confirmado', `Receta ${pickup.id} entregada.`, 'success')
-      closePickup()
-      await load(chip)
-    } catch (err) {
-      showToast('No se pudo confirmar el retiro', err.message, 'danger')
-    } finally {
-      setDelivering(false)
-    }
+    const rx = cancelRx
+    setCancelRx(null)
+    await runAction(rx.id, () => prescriptionsApi.cancel(rx.id, { reason: cancelReason.trim() }), 'Receta anulada')
   }
-
-  const guardians = pickup?.patient?.guardians || []
 
   return (
     <>
@@ -258,7 +224,8 @@ export default function Recetas() {
                       {acts.includes('deliver') && (
                         <button
                           className="btn btn-success btn-sm"
-                          onClick={() => openPickup(r)}
+                          disabled={busy}
+                          onClick={() => setPickup(r)}
                         >
                           Confirmar Retiro
                         </button>
@@ -267,7 +234,7 @@ export default function Recetas() {
                         <button
                           className="btn btn-danger btn-sm"
                           disabled={busy}
-                          onClick={() => runAction(r.id, () => prescriptionsApi.cancel(r.id, { reason: 'Anulada desde recetas' }), 'Receta anulada')}
+                          onClick={() => openCancel(r)}
                         >
                           Anular
                         </button>
@@ -281,125 +248,41 @@ export default function Recetas() {
         )}
       </div>
 
-      <Modal
-        open={!!pickup}
-        onClose={closePickup}
-        large
-        title="Confirmar Retiro"
+      <DeliverModal
+        prescription={pickup}
         subtitle={pickup ? `${patientLabel(pickup)} · ${medicationLabel(pickup)}` : ''}
+        onClose={() => setPickup(null)}
+        onDelivered={() => {
+          setPickup(null)
+          load(chip)
+        }}
+      />
+
+      <Modal
+        open={!!cancelRx}
+        onClose={() => setCancelRx(null)}
+        title="Anular receta"
+        subtitle={cancelRx ? `Receta ${cancelRx.id} · ${patientLabel(cancelRx)}` : ''}
         actions={
           <>
-            <button className="btn btn-outline" onClick={closePickup} disabled={delivering}>
+            <button className="btn btn-outline" onClick={() => setCancelRx(null)}>
               Cancelar
             </button>
-            <button className="btn btn-success" onClick={submitPickup} disabled={delivering}>
-              Confirmar Retiro
+            <button className="btn btn-danger" onClick={submitCancel}>
+              Anular receta
             </button>
           </>
         }
       >
         <div className="input-group">
-          <label>¿Quién retira?</label>
-          <div className="radio-list">
-            <label className="radio-row">
-              <input
-                type="radio"
-                name="picker-type"
-                value="patient"
-                checked={form.pickerType === 'patient'}
-                onChange={() => setForm((f) => ({ ...f, pickerType: 'patient' }))}
-              />{' '}
-              El propio paciente
-            </label>
-
-            <label className="radio-row">
-              <input
-                type="radio"
-                name="picker-type"
-                value="guardian"
-                checked={form.pickerType === 'guardian'}
-                onChange={() => setForm((f) => ({ ...f, pickerType: 'guardian' }))}
-              />{' '}
-              Un apoderado autorizado
-            </label>
-            <select
-              className="select subfield-indent"
-              disabled={form.pickerType !== 'guardian'}
-              value={form.guardianId}
-              onChange={(e) => setForm((f) => ({ ...f, guardianId: e.target.value }))}
-            >
-              <option value="">Seleccione apoderado…</option>
-              {guardians.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {fullName(g)}{g.relationship ? ` (${g.relationship})` : ''}{g.rut ? ` — ${g.rut}` : ''}
-                </option>
-              ))}
-            </select>
-
-            <label className="radio-row">
-              <input
-                type="radio"
-                name="picker-type"
-                value="third-party"
-                checked={form.pickerType === 'third-party'}
-                onChange={() => setForm((f) => ({ ...f, pickerType: 'third-party' }))}
-              />{' '}
-              Un tercero autorizado verbalmente
-            </label>
-            <div className="grid grid-2 subfield-indent">
-              <div className="input-group">
-                <label>RUT del tercero</label>
-                <input
-                  className="input"
-                  type="text"
-                  placeholder="12.345.678-9"
-                  disabled={form.pickerType !== 'third-party'}
-                  value={form.thirdPartyRut}
-                  onChange={(e) => setForm((f) => ({ ...f, thirdPartyRut: e.target.value }))}
-                />
-              </div>
-              <div className="input-group">
-                <label>Nombre completo</label>
-                <input
-                  className="input"
-                  type="text"
-                  placeholder="Nombre Apellido"
-                  disabled={form.pickerType !== 'third-party'}
-                  value={form.thirdPartyName}
-                  onChange={(e) => setForm((f) => ({ ...f, thirdPartyName: e.target.value }))}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-2 mt-3">
-          <div className="input-group">
-            <label>Partida a entregar (FEFO — vence primero)</label>
-            <select
-              className="select"
-              value={form.batchId}
-              onChange={(e) => setForm((f) => ({ ...f, batchId: e.target.value }))}
-            >
-              {batches.length === 0 && <option value="">Sin partidas disponibles</option>}
-              {batches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.batchNumber} — vence {b.expirationDate} — disponible: {b.availableQuantity}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="input-group">
-            <label>Cantidad a entregar</label>
-            <input
-              className="input"
-              type="number"
-              min="1"
-              placeholder="0"
-              value={form.quantity}
-              onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
-            />
-          </div>
+          <label htmlFor="cancel-reason">Motivo de anulación</label>
+          <input
+            id="cancel-reason"
+            className="input"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Motivo de la anulación"
+          />
         </div>
       </Modal>
     </>

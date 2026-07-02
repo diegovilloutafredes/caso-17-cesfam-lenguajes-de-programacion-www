@@ -24,6 +24,14 @@ export function stockStatus(s) {
   return STOCK_STATUS[s] || { label: s, badge: 'muted' }
 }
 
+// El listado de medicamentos no trae el estado calculado.
+export function computeStockStatus(med) {
+  const available = med?.stock?.availableQuantity ?? 0
+  if (available === 0) return 'OUT_OF_STOCK'
+  if (available < (med?.minStock ?? 0)) return 'LOW_STOCK'
+  return 'AVAILABLE'
+}
+
 export function fullName(p) {
   if (!p) return ''
   return [p.firstName, p.lastName].filter(Boolean).join(' ')

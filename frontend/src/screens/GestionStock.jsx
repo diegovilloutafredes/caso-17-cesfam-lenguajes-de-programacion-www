@@ -1,17 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { inventoryApi, reportsApi } from '../api'
 import Modal from '../components/Modal'
 import { Badge, Kpi, SearchBar, PageHeader, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
-import { stockStatus } from '../lib/format'
-
-// Calcula el estado de stock de un medicamento de la lista (no viene en el envelope).
-function computeStatus(med) {
-  const available = med.stock?.availableQuantity ?? 0
-  if (available === 0) return 'OUT_OF_STOCK'
-  if (available < (med.minStock ?? 0)) return 'LOW_STOCK'
-  return 'AVAILABLE'
-}
+import { stockStatus, computeStockStatus } from '../lib/format'
 
 const REPORT_TYPES = [
   { value: 'STOCK', label: 'STOCK' },
@@ -47,7 +39,10 @@ export default function GestionStock() {
   const [writeOffForm, setWriteOffForm] = useState({ reason: '', quantity: '', discard: false, notes: '' })
   const [reportForm, setReportForm] = useState({ reportType: 'STOCK', dateFrom: '', dateTo: '' })
 
+  const loadReqRef = useRef(0)
+
   const load = useCallback(async () => {
+    const req = ++loadReqRef.current
     setLoading(true)
     try {
       const [sum, low, meds] = await Promise.all([
@@ -55,13 +50,15 @@ export default function GestionStock() {
         inventoryApi.lowStock(),
         inventoryApi.listMedications({ search, page: 1, limit: 50 }),
       ])
+      if (loadReqRef.current !== req) return
       setSummary(sum)
       setAlerts(low || [])
       setMedications(meds.data || [])
     } catch (err) {
+      if (loadReqRef.current !== req) return
       showToast('Error al cargar', err.message, 'danger')
     } finally {
-      setLoading(false)
+      if (loadReqRef.current === req) setLoading(false)
     }
   }, [search, showToast])
 
@@ -116,7 +113,7 @@ export default function GestionStock() {
       })
       setAddOpen(false)
       showToast('Partida registrada', 'Stock actualizado.', 'success')
-      await refresh(detailOpen ? addForm.medicationId : null)
+      await load()
     } catch (err) {
       showToast('Error al ingresar stock', err.message, 'danger')
     }
@@ -229,7 +226,7 @@ export default function GestionStock() {
             </thead>
             <tbody>
               {medications.map((m) => {
-                const s = stockStatus(computeStatus(m))
+                const s = stockStatus(computeStockStatus(m))
                 return (
                   <tr key={m.id}>
                     <td>
@@ -245,7 +242,6 @@ export default function GestionStock() {
                     <td className="actions">
                       <button className="btn btn-outline btn-sm" onClick={() => openDetail(m)}>Ver detalle</button>
                       <button className="btn btn-primary btn-sm" onClick={() => openAdd(m.id)}>Agregar Stock</button>
-                      <button className="btn btn-outline btn-sm" onClick={() => openDetail(m)}>– Dar de baja</button>
                     </td>
                   </tr>
                 )
@@ -270,7 +266,7 @@ export default function GestionStock() {
         }
       >
         {detail && (() => {
-          const s = stockStatus(computeStatus(detail))
+          const s = stockStatus(computeStockStatus(detail))
           return (
             <>
               <div className="row-between" style={{ alignItems: 'flex-start' }}>
@@ -346,8 +342,9 @@ export default function GestionStock() {
       >
         <div className="grid grid-2">
           <div className="input-group">
-            <label>Medicamento</label>
+            <label htmlFor="add-medication">Medicamento</label>
             <select
+              id="add-medication"
               className="select"
               value={addForm.medicationId}
               onChange={(e) => setAddForm({ ...addForm, medicationId: e.target.value })}
@@ -359,8 +356,9 @@ export default function GestionStock() {
             </select>
           </div>
           <div className="input-group">
-            <label>N° Partida</label>
+            <label htmlFor="add-batch-number">N° Partida</label>
             <input
+              id="add-batch-number"
               className="input"
               type="text"
               placeholder="Ej: P-2026-001"
@@ -369,8 +367,9 @@ export default function GestionStock() {
             />
           </div>
           <div className="input-group">
-            <label>Cantidad inicial</label>
+            <label htmlFor="add-quantity">Cantidad inicial</label>
             <input
+              id="add-quantity"
               className="input"
               type="number"
               placeholder="Ej: 500"
@@ -379,8 +378,9 @@ export default function GestionStock() {
             />
           </div>
           <div className="input-group">
-            <label>Fecha de vencimiento</label>
+            <label htmlFor="add-expiration">Fecha de vencimiento</label>
             <input
+              id="add-expiration"
               className="input"
               type="date"
               value={addForm.expirationDate}
@@ -408,8 +408,9 @@ export default function GestionStock() {
         )}
         <div className="grid grid-2">
           <div className="input-group">
-            <label>Motivo</label>
+            <label htmlFor="writeoff-reason">Motivo</label>
             <select
+              id="writeoff-reason"
               className="select"
               value={writeOffForm.reason}
               onChange={(e) => setWriteOffForm({ ...writeOffForm, reason: e.target.value })}
@@ -421,8 +422,9 @@ export default function GestionStock() {
             </select>
           </div>
           <div className="input-group">
-            <label>Cantidad</label>
+            <label htmlFor="writeoff-quantity">Cantidad</label>
             <input
+              id="writeoff-quantity"
               className="input"
               type="number"
               placeholder="Ej: 10"
@@ -441,8 +443,9 @@ export default function GestionStock() {
           <label htmlFor="desechar" style={{ margin: 0 }}>Registrar descarte físico (auditoría)</label>
         </div>
         <div className="input-group mt-3">
-          <label>Observaciones</label>
+          <label htmlFor="writeoff-notes">Observaciones</label>
           <textarea
+            id="writeoff-notes"
             className="textarea"
             placeholder="Detalle del motivo..."
             value={writeOffForm.notes}
@@ -465,8 +468,9 @@ export default function GestionStock() {
         }
       >
         <div className="input-group">
-          <label>Tipo de informe</label>
+          <label htmlFor="report-type">Tipo de informe</label>
           <select
+            id="report-type"
             className="select"
             value={reportForm.reportType}
             onChange={(e) => setReportForm({ ...reportForm, reportType: e.target.value })}
@@ -478,8 +482,9 @@ export default function GestionStock() {
         </div>
         <div className="grid grid-2 mt-3">
           <div className="input-group">
-            <label>Desde</label>
+            <label htmlFor="report-from">Desde</label>
             <input
+              id="report-from"
               className="input"
               type="date"
               value={reportForm.dateFrom}
@@ -487,8 +492,9 @@ export default function GestionStock() {
             />
           </div>
           <div className="input-group">
-            <label>Hasta</label>
+            <label htmlFor="report-to">Hasta</label>
             <input
+              id="report-to"
               className="input"
               type="date"
               value={reportForm.dateTo}

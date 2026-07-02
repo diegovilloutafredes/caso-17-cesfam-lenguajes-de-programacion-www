@@ -5,7 +5,7 @@ import ActivePrescriptionsList from '../components/ActivePrescriptionsList'
 import { Doughnut, ChartCard, CHART, baseOptions } from '../components/charts'
 import { SearchBar, PageHeader, Empty, Badge } from '../components/ui'
 import { useToast } from '../context/ToastContext'
-import { prescriptionStatus, fullName } from '../lib/format'
+import { prescriptionStatus, fullName, computeStockStatus } from '../lib/format'
 
 const emptyForm = {
   patientId: '',
@@ -26,11 +26,11 @@ const STATE_COLORS = {
   EXPIRED: '#9CA3AF',
 }
 
-// Disponibilidad del medicamento elegido al recetar (ayuda la decisión clínica).
 function medStock(m) {
   const a = m?.stock?.availableQuantity ?? 0
-  if (a === 0) return { label: 'Sin stock', type: 'danger' }
-  if (a < (m?.minStock ?? 0)) return { label: `Stock bajo (${a} disponibles)`, type: 'warning' }
+  const status = computeStockStatus(m)
+  if (status === 'OUT_OF_STOCK') return { label: 'Sin stock', type: 'danger' }
+  if (status === 'LOW_STOCK') return { label: `Stock bajo (${a} disponibles)`, type: 'warning' }
   return { label: `En stock (${a} disponibles)`, type: 'success' }
 }
 
@@ -41,7 +41,7 @@ export default function PanelMedico() {
   const [loading, setLoading] = useState(true)
 
   const [search, setSearch] = useState('')
-  const [patients, setPatients] = useState([])
+  const [results, setResults] = useState(null) // null = sin búsqueda activa
 
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState(null)
@@ -57,7 +57,6 @@ export default function PanelMedico() {
     try {
       const doctor = await dashboardsApi.doctor()
       setDashboard(doctor)
-      setPatients(doctor.recentPatients || [])
     } catch (err) {
       showToast('Error al cargar el panel', err.message, 'danger')
     } finally {
@@ -73,14 +72,14 @@ export default function PanelMedico() {
   useEffect(() => {
     const term = search.trim()
     if (!term) {
-      setPatients(dashboard?.recentPatients || [])
+      setResults(null)
       return
     }
     let cancelled = false
     const t = setTimeout(async () => {
       try {
         const res = await patientsApi.list({ search: term, page: 1, limit: 10 })
-        if (!cancelled) setPatients(res.data || [])
+        if (!cancelled) setResults(res.data || [])
       } catch (err) {
         if (!cancelled) showToast('Error en la búsqueda', err.message, 'danger')
       }
@@ -89,7 +88,9 @@ export default function PanelMedico() {
       cancelled = true
       clearTimeout(t)
     }
-  }, [search, dashboard, showToast])
+  }, [search, showToast])
+
+  const patients = results ?? (dashboard?.recentPatients || [])
 
   async function openHistory(patientId) {
     setHistoryOpen(true)
@@ -335,8 +336,9 @@ export default function PanelMedico() {
       >
         <div className="grid grid-2">
           <div className="input-group">
-            <label>Paciente</label>
+            <label htmlFor="rx-patient">Paciente</label>
             <select
+              id="rx-patient"
               className="select"
               value={form.patientId}
               onChange={(e) => setField('patientId', e.target.value)}
@@ -350,8 +352,9 @@ export default function PanelMedico() {
             </select>
           </div>
           <div className="input-group">
-            <label>Medicamento</label>
+            <label htmlFor="rx-medication">Medicamento</label>
             <select
+              id="rx-medication"
               className="select"
               value={form.medicationId}
               onChange={(e) => setField('medicationId', e.target.value)}
@@ -370,8 +373,9 @@ export default function PanelMedico() {
             )}
           </div>
           <div className="input-group">
-            <label>Frecuencia (horas)</label>
+            <label htmlFor="rx-interval">Frecuencia (horas)</label>
             <select
+              id="rx-interval"
               className="select"
               value={form.intervalHours}
               onChange={(e) => setField('intervalHours', e.target.value)}
@@ -383,8 +387,9 @@ export default function PanelMedico() {
             </select>
           </div>
           <div className="input-group">
-            <label>Duración (días)</label>
+            <label htmlFor="rx-duration">Duración (días)</label>
             <select
+              id="rx-duration"
               className="select"
               value={form.durationDays}
               onChange={(e) => setField('durationDays', e.target.value)}
@@ -395,8 +400,9 @@ export default function PanelMedico() {
             </select>
           </div>
           <div className="input-group">
-            <label>Tipo de Tratamiento</label>
+            <label htmlFor="rx-treatment">Tipo de Tratamiento</label>
             <select
+              id="rx-treatment"
               className="select"
               value={form.treatmentType}
               onChange={(e) => setField('treatmentType', e.target.value)}
@@ -406,8 +412,9 @@ export default function PanelMedico() {
             </select>
           </div>
           <div className="input-group">
-            <label>Cantidad</label>
+            <label htmlFor="rx-quantity">Cantidad</label>
             <input
+              id="rx-quantity"
               className="input"
               type="number"
               min="1"
