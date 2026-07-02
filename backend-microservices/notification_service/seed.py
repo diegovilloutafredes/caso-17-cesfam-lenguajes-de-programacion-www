@@ -1,9 +1,3 @@
-"""Seed de NotificationService (PostgreSQL).
-
-Inserta los mismos datos del seed in-memory original, solo si la tabla está vacía.
-El helper `next_id` calcula el próximo sufijo consultando el MAX en la BD.
-"""
-
 from datetime import datetime
 
 from sqlalchemy import func, select

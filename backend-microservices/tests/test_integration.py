@@ -1,10 +1,4 @@
-"""Tests de integración cross-service (entran por el ApiGateway).
-
-Cubren el flujo feliz extremo a extremo y, sobre todo, los CAMINOS DE FALLA donde
-cambió la frontera transaccional al pasar a microservicios: compensación en una
-preparación parcial, liberación al cancelar, y transición inválida. Las aserciones
-son relativas (antes/después) para ser repetibles sin reiniciar el estado.
-"""
+"""Aserciones relativas (antes/después) para poder repetir sin resetear datos."""
 
 
 def _item(med, qty):
@@ -25,8 +19,6 @@ def _create(client, auth, items, patient="PAT-002"):
     })
 
 
-# --- Salud y autenticación -------------------------------------------------
-
 def test_health(client):
     assert client.get("/health").status_code == 200
 
@@ -37,12 +29,10 @@ def test_login(client):
     assert d["user"]["role"] == "doctor"
 
 
-# --- BFF (agregación cross-service) ----------------------------------------
-
 def test_doctor_dashboard(client, auth):
     d = client.get("/api/v1/doctor/dashboard", headers=auth).json()["data"]
     assert {"prescriptionStates", "recentPatients"} <= d.keys()
-    assert len(d["recentPatients"]) > 0  # pacientes con actividad clínica reciente
+    assert len(d["recentPatients"]) > 0
 
 
 def test_pharmacy_dashboard(client, pharmacy_auth):
@@ -61,8 +51,6 @@ def test_pharmacy_top_medications_window(client, pharmacy_auth):
     assert allt["window"]["days"] == 0
 
 
-# --- Proxy a servicios de dominio ------------------------------------------
-
 def test_patients_list_via_proxy(client, auth):
     d = client.get("/api/v1/patients", headers=auth).json()["data"]
     assert d["pagination"]["total"] >= 5
@@ -73,8 +61,6 @@ def test_medication_detail_via_proxy(client, auth):
     assert d["description"] == "Paracetamol 500mg"
     assert {"availableQuantity", "reservedQuantity", "physicalQuantity"} <= d["stock"].keys()
 
-
-# --- Flujo feliz extremo a extremo -----------------------------------------
 
 def test_full_flow_create_prepare_deliver(client, auth, pharmacy_auth):
     before = _stock(client, auth)
@@ -97,15 +83,12 @@ def test_full_flow_create_prepare_deliver(client, auth, pharmacy_auth):
     assert after["physicalQuantity"] == before["physicalQuantity"] - 10
 
 
-# --- Caminos de falla (lo crítico al pasar a microservicios) ----------------
-
 def test_create_with_unknown_patient(client, auth):
     err = _create(client, auth, [_item("MED-0001", 5)], patient="PAT-999").json()["error"]
     assert err["code"] == "PATIENT_NOT_FOUND"
 
 
 def test_compensation_on_partial_prepare(client, auth, pharmacy_auth):
-    """Stock insuficiente en la 2ª línea: la 1ª (ya reservada) debe liberarse."""
     before = _stock(client, auth, "MED-0001")
     rid = _create(client, auth, [_item("MED-0001", 5), _item("MED-0003", 5)]).json()["data"]["id"]
 
@@ -114,7 +97,7 @@ def test_compensation_on_partial_prepare(client, auth, pharmacy_auth):
     assert err["details"]["medicationId"] == "MED-0003"
 
     after = _stock(client, auth, "MED-0001")
-    assert after == before  # la reserva de la línea 1 fue compensada (liberada)
+    assert after == before  # la línea 1 quedó liberada
     status = client.get(f"/api/v1/prescriptions/{rid}", headers=auth).json()["data"]["status"]
     assert status == "SUBMITTED"
 
@@ -177,7 +160,8 @@ def test_consume_rejects_expired_batch(client, pharmacy_auth):
     """No se entrega desde una partida vencida (BCH-003 venció en junio 2026)."""
     r = client.post(
         "/api/v1/medications/consume", headers=pharmacy_auth,
-        json={"allocations": [{"batchId": "BCH-003", "quantity": 1}]},
+        json={"allocations": [{"batchId": "BCH-003", "quantity": 1}],
+              "expectedItems": [{"medicationId": "MED-0004", "quantity": 1}]},
     )
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "EXPIRED_BATCH"
@@ -195,7 +179,7 @@ def test_consume_validates_aggregate_per_batch(client, pharmacy_auth):
         json={"allocations": [
             {"batchId": "BCH-006", "quantity": available},
             {"batchId": "BCH-006", "quantity": available},
-        ]},
+        ], "expectedItems": [{"medicationId": "MED-0007", "quantity": available * 2}]},
     )
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "INSUFFICIENT_BATCH"
@@ -211,11 +195,8 @@ def test_role_enforcement(client, auth, pharmacy_auth):
     assert r.status_code == 403
 
 
-# --- Invariantes de inventario ----------------------------------------------
-
 def test_reserved_matches_ready_prescriptions(client, auth):
-    """reservedQuantity de cada medicamento = Σ items de recetas READY_FOR_PICKUP.
-    Las RESERVED no retienen stock: la reserva ocurre al pasar a READY."""
+    """reserved = suma de items READY_FOR_PICKUP; RESERVED no retiene stock."""
     ready = client.get(
         "/api/v1/prescriptions?status_filter=READY_FOR_PICKUP&limit=200", headers=auth,
     ).json()["data"]["data"]
@@ -243,7 +224,6 @@ def test_write_off_preserves_invariant(client, auth, pharmacy_auth):
 
 
 def test_deliver_requires_full_quantity(client, auth, pharmacy_auth):
-    """deliver exige que las partidas sumen lo recetado (entrega completa, no parcial)."""
     rid = _create(client, auth, [_item("MED-0001", 10)]).json()["data"]["id"]
     client.post(f"/api/v1/prescriptions/{rid}/prepare", headers=pharmacy_auth)  # READY, reserva 10
     err = client.post(
@@ -253,8 +233,6 @@ def test_deliver_requires_full_quantity(client, auth, pharmacy_auth):
     assert err["code"] == "QUANTITY_MISMATCH"
     client.post(f"/api/v1/prescriptions/{rid}/cancel", headers=pharmacy_auth, json={"reason": "limpieza"})
 
-
-# --- Reportería C8 ----------------------------------------------------------
 
 def test_prescription_trend(client, auth):
     d = client.get(

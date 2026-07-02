@@ -328,7 +328,7 @@ Devuelve:
 
 ### Cómo usar el token
 
-Una vez logueado, el token va en el header `Authorization`:
+Una vez iniciada la sesión, el token va en el encabezado `Authorization`:
 
 ```bash
 curl http://localhost:8000/api/v1/doctor/dashboard \
@@ -336,7 +336,7 @@ curl http://localhost:8000/api/v1/doctor/dashboard \
 ```
 
 En **Swagger UI**, (recomendado para explorar):
-1. Click en el botón **Authorize** (arriba a la derecha de la página).
+1. Haz clic en el botón **Authorize** (arriba a la derecha de la página).
 2. Pegar el token, (por ejemplo: `sandbox-token-USR-002`) **sin** el prefijo "Bearer".
 3. Ahora cualquier endpoint que ejecutes incluye el header automáticamente
 

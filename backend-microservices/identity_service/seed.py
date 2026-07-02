@@ -1,5 +1,3 @@
-"""Seed local de IdentityService. Solo conoce sus propios users."""
-
 from sqlalchemy import select
 
 from identity_service.db import SessionLocal
@@ -25,7 +23,7 @@ USERS = [
     {
         "id": "USR-003",
         "username": "dralopez",
-        "rut": "13.555.444-3",
+        "rut": "13.555.444-8",
         "fullName": "Dra. Ana López",
         "email": "ana.lopez@cesfam.cl",
         "role": "doctor",
@@ -34,7 +32,6 @@ USERS = [
 
 
 def seed() -> None:
-    """Inserta los usuarios del seed solo si la tabla está vacía (idempotente)."""
     db = SessionLocal()
     try:
         if db.execute(select(User.id).limit(1)).first() is not None:

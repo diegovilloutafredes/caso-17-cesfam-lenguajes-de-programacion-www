@@ -1,5 +1,3 @@
-"""Seed local de PatientService (PostgreSQL). Solo conoce patients + guardians."""
-
 from datetime import date
 
 from sqlalchemy import func, select
@@ -17,28 +15,28 @@ def seed() -> None:
 
         patients = [
             Patient(
-                id="PAT-001", rut="12.345.678-9",
+                id="PAT-001", rut="12.345.678-5",
                 firstName="María", lastName="González González",
-                birthDate=date(1955, 8, 12), address="Calle BKN 1543, Limache",
+                birthDate=date(1955, 8, 12), address="Calle Baquedano 1543, Limache",
                 phone="+56 9 1234 9300", email="maria70@gmail.com",
                 patientCardNumber="CP-2024-12345", patientCardIssueDate=date(2024, 3, 15),
             ),
             Patient(
-                id="PAT-002", rut="23.456.789-0",
+                id="PAT-002", rut="23.456.789-6",
                 firstName="Carlos", lastName="Ramírez",
                 birthDate=date(1968, 2, 4), address="Av. Central 234, Limache",
                 phone="+56 9 8888 7777", email="carlos.ramirez@correo.cl",
                 patientCardNumber="CP-2024-23456", patientCardIssueDate=date(2024, 4, 2),
             ),
             Patient(
-                id="PAT-003", rut="34.567.890-1",
+                id="PAT-003", rut="34.567.890-5",
                 firstName="Ana", lastName="Martínez",
                 birthDate=date(1972, 11, 23), address="Pasaje 12 #43, Quillota",
                 phone="+56 9 7777 6666", email="ana.martinez@correo.cl",
                 patientCardNumber="CP-2024-34567", patientCardIssueDate=date(2024, 5, 10),
             ),
             Patient(
-                id="PAT-004", rut="45.678.901-2",
+                id="PAT-004", rut="45.678.901-3",
                 firstName="Pedro", lastName="Silva",
                 birthDate=date(1980, 7, 17), address="Calle Los Olivos 88, Limache",
                 phone="+56 9 6666 5555", email="pedro.silva@correo.cl",
@@ -47,7 +45,7 @@ def seed() -> None:
             Patient(
                 id="PAT-005", rut="13.464.215-7",
                 firstName="Gustavo", lastName="González González",
-                birthDate=date(1958, 4, 22), address="Calle BKN 1543, Limache",
+                birthDate=date(1958, 4, 22), address="Calle Baquedano 1543, Limache",
                 phone="+56 9 1234 9301", email="gustavo@correo.cl",
                 patientCardNumber="CP-2024-13464", patientCardIssueDate=date(2024, 3, 15),
             ),
@@ -57,8 +55,8 @@ def seed() -> None:
         guardians = [
             Guardian(
                 id="GRD-001", patientId="PAT-001",
-                rut="18.434.915-K", firstName="Pedri", lastName="González",
-                phone="+56 9 2222 1111", email="pedri@correo.cl",
+                rut="18.434.915-9", firstName="Pedro", lastName="González",
+                phone="+56 9 2222 1111", email="pedro.gonzalez@correo.cl",
                 relationship_="Hijo", authorizationDate=date(2024, 9, 12),
             ),
             Guardian(

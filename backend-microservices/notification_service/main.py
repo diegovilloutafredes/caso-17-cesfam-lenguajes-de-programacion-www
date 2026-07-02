@@ -1,9 +1,3 @@
-"""NotificationService — envío de SMS/email a pacientes y apoderados.
-
-Integración real con Twilio/SendGrid en producción; en sandbox los envíos
-son stubs que solo loguean. Ver `providers.py`.
-"""
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

@@ -1,5 +1,3 @@
-"""InventoryService — catálogo de medicamentos, partidas, stock y bajas."""
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

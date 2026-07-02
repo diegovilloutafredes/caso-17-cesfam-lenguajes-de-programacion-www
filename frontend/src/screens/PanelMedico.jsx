@@ -68,7 +68,7 @@ export default function PanelMedico() {
     loadDashboard()
   }, [loadDashboard])
 
-  // Búsqueda de pacientes: vacía → recientes; con texto → consulta API (con debounce).
+  // sin texto muestra los recientes; con texto busca con debounce
   useEffect(() => {
     const term = search.trim()
     if (!term) {
@@ -153,11 +153,11 @@ export default function PanelMedico() {
           },
         ],
       })
-      showToast('Prescripción creada', 'Receta emitida y enviada a farmacia.', 'success')
+      showToast('Receta creada', 'Emitida y enviada a farmacia.', 'success')
       setRxOpen(false)
       loadDashboard()
     } catch (err) {
-      showToast('Error al crear la prescripción', err.message, 'danger')
+      showToast('Error al crear la receta', err.message, 'danger')
     } finally {
       setSaving(false)
     }
@@ -180,7 +180,7 @@ export default function PanelMedico() {
     <>
       <PageHeader title="Panel Médico" subtitle="Gestión de pacientes y prescripciones">
         <button className="btn btn-primary" onClick={openPrescription}>
-          ＋ Nueva Prescripción
+          ＋ Nueva Receta
         </button>
       </PageHeader>
 
@@ -317,19 +317,19 @@ export default function PanelMedico() {
         )}
       </Modal>
 
-      {/* Modal: Nueva prescripción */}
+      {/* Modal: Nueva receta */}
       <Modal
         open={rxOpen}
         onClose={() => setRxOpen(false)}
-        title="Nueva Prescripción"
-        subtitle="Complete los datos para emitir la receta del paciente."
+        title="Nueva Receta"
+        subtitle="Completa los datos para emitir la receta del paciente."
         actions={
           <>
             <button className="btn btn-outline" onClick={() => setRxOpen(false)} disabled={saving}>
               Cancelar
             </button>
             <button className="btn btn-primary" onClick={submitPrescription} disabled={saving}>
-              {saving ? 'Creando…' : 'Crear Prescripción'}
+              {saving ? 'Creando…' : 'Crear Receta'}
             </button>
           </>
         }

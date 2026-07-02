@@ -21,7 +21,6 @@ class PrescriptionServiceClient(ServiceClient):
         )
 
     def list_all(self, token: str, page_size: int = 200) -> dict:
-        """Trae todas las recetas paginando hasta agotar (sin tope silencioso)."""
         first = self.get("/api/v1/prescriptions", token=token,
                          params={"page": 1, "limit": page_size})
         data = (first or {}).get("data") or {}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Arranca los 7 servicios LOCALMENTE (sin Docker), cada uno como un proceso uvicorn en background.
+# Arranca los 7 servicios sin Docker, cada uno como proceso uvicorn en segundo plano.
 # Los logs van a ./logs/, los PIDs a ./.pids/.
 # Detener con ./stop-local.sh
 
@@ -7,7 +7,7 @@ set -e
 cd "$(dirname "$0")"
 
 if [ ! -d ".venv" ]; then
-    echo "✗ .venv no existe. Corré ./install-local.sh primero."
+    echo "✗ .venv no existe. Ejecuta ./install-local.sh primero."
     exit 1
 fi
 
@@ -16,14 +16,14 @@ source .venv/bin/activate
 # Verificar que los puertos estén libres
 for port in 8000 8001 8002 8003 8004 8005 8006; do
     if lsof -ti:$port >/dev/null 2>&1; then
-        echo "✗ Puerto $port ya está en uso (PID $(lsof -ti:$port)). Liberalo antes de arrancar."
+        echo "✗ Puerto $port ya está en uso (PID $(lsof -ti:$port)). Libéralo antes de iniciar."
         exit 1
     fi
 done
 
 mkdir -p logs .pids
 
-# Orden importa: leaf services primero (sin clientes inter-servicio), después orquestadores
+# el orden importa: primero los servicios que no llaman a otros
 SERVICES=(
     "identity_service:8001"
     "patient_service:8002"
@@ -34,7 +34,7 @@ SERVICES=(
     "api_gateway:8000"
 )
 
-# Env vars: cuando corremos local, todos los servicios viven en localhost
+# en local todos los servicios viven en localhost
 export IDENTITY_SERVICE_URL="http://localhost:8001"
 export PATIENT_SERVICE_URL="http://localhost:8002"
 export INVENTORY_SERVICE_URL="http://localhost:8003"

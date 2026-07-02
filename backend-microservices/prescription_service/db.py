@@ -1,9 +1,3 @@
-"""Almacén PostgreSQL propio de PrescriptionService (Database per Service).
-
-Base/metadata exclusiva de este servicio (solo sus tablas) y fábrica de sesiones
-síncronas a partir de `DATABASE_URL`.
-"""
-
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from shared.db import build_session_factory

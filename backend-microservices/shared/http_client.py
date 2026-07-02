@@ -1,11 +1,3 @@
-"""Cliente HTTP base para llamadas inter-servicio.
-
-Incluye:
-- Retry con backoff exponencial (3 intentos) usando tenacity
-- Circuit Breaker funcional con estados CLOSED → OPEN → HALF_OPEN
-- Manejo estructurado de ApiResponse<T>
-"""
-
 import threading
 import time
 from typing import Optional
@@ -20,18 +12,10 @@ from tenacity import (
 
 
 class CircuitBreakerOpen(Exception):
-    """Se lanza cuando el breaker está abierto y no permite la llamada."""
+    pass
 
 
 class CircuitBreaker:
-    """Circuit breaker con tres estados:
-
-    - CLOSED: las llamadas pasan; se cuentan fallos consecutivos.
-    - OPEN: tras `failure_threshold` fallos, falla rápido con `CircuitBreakerOpen`;
-      pasa a HALF_OPEN al cumplirse `reset_timeout`.
-    - HALF_OPEN: una llamada de prueba; éxito → CLOSED, fallo → OPEN.
-    """
-
     def __init__(
         self,
         name: str,
@@ -56,7 +40,7 @@ class CircuitBreaker:
             self._maybe_half_open()
             if self.state == "OPEN":
                 raise CircuitBreakerOpen(
-                    f"Circuit {self.name} OPEN — service unavailable"
+                    f"Circuito {self.name} abierto — servicio no disponible"
                 )
 
         try:
@@ -81,11 +65,7 @@ class CircuitBreaker:
 
 
 class ServiceClient:
-    """Cliente HTTP base para llamadas inter-servicio.
-
-    Cada subclase configura `base_url` y `service_name`. Aporta retry, CB y
-    parsing de ApiResponse<T>.
-    """
+    """Las subclases definen base_url y service_name."""
 
     def __init__(
         self,
@@ -109,8 +89,7 @@ class ServiceClient:
         url = f"{self.base_url}{path}"
         headers = {"Authorization": f"Bearer {token}"} if token else {}
 
-        # Un POST que expiró por timeout pudo haberse aplicado igual en el destino:
-        # reintentarlo lo duplicaría. Solo se reintenta lo que nunca llegó a enviarse.
+        # un POST con timeout pudo haberse aplicado igual; solo se reintenta lo que no alcanzó a salir
         retry_on = (
             (httpx.TransportError,)
             if method == "GET"
@@ -129,7 +108,7 @@ class ServiceClient:
                     method, url, headers=headers, json=json, params=params
                 )
 
-        # Envolver todas las posibles fallas (red + CB) en ApiResponse-shaped dict
+        # las fallas se devuelven como envelope de error, no como excepción
         try:
             response = self.breaker.call(do_request)
         except CircuitBreakerOpen:
@@ -138,7 +117,7 @@ class ServiceClient:
                 "data": None,
                 "error": {
                     "code": "CIRCUIT_OPEN",
-                    "message": f"Service {self.service_name} unavailable (circuit open)",
+                    "message": f"Servicio {self.service_name} no disponible (circuito abierto)",
                 },
             }
         except httpx.ConnectError:
@@ -147,7 +126,7 @@ class ServiceClient:
                 "data": None,
                 "error": {
                     "code": "CONNECTION_REFUSED",
-                    "message": f"Cannot reach {self.service_name}",
+                    "message": f"No se pudo contactar al servicio {self.service_name}",
                 },
             }
         except httpx.TimeoutException:
@@ -156,7 +135,7 @@ class ServiceClient:
                 "data": None,
                 "error": {
                     "code": "TIMEOUT",
-                    "message": f"Timeout calling {self.service_name}",
+                    "message": f"Tiempo de espera agotado al llamar a {self.service_name}",
                 },
             }
         except Exception as e:
@@ -165,7 +144,7 @@ class ServiceClient:
                 "data": None,
                 "error": {
                     "code": "BAD_GATEWAY",
-                    "message": f"Error calling {self.service_name}: {e}",
+                    "message": f"Error al llamar a {self.service_name}: {e}",
                 },
             }
         try:
@@ -176,7 +155,7 @@ class ServiceClient:
                 "data": None,
                 "error": {
                     "code": "BAD_RESPONSE",
-                    "message": f"No-JSON response from {self.service_name}",
+                    "message": f"Respuesta no válida del servicio {self.service_name}",
                 },
             }
 

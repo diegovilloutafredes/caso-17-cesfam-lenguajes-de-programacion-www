@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from notification_service.db import get_session
@@ -17,7 +18,6 @@ router = APIRouter(prefix="/api/v1/notifications", tags=["Notificaciones"])
 
 
 def _serialize(n: Notification) -> dict:
-    """Produce la misma forma JSON que el almacén in-memory original."""
     return {
         "id": n.id,
         "type": n.type,
@@ -38,7 +38,6 @@ def send_notification(
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    """Envía notificación (SMS o email) usando el provider correspondiente + persiste registro."""
     if body.type == NotificationType.SMS:
         success = sms_provider.send(to=body.recipientAddress, message=body.message)
     else:
@@ -48,22 +47,30 @@ def send_notification(
             body=body.message,
         )
 
-    new_id = next_id(db, Notification.id, "NTF-")
-    record = Notification(
-        id=new_id,
-        type=body.type.value if hasattr(body.type, "value") else body.type,
-        event=body.event.value if hasattr(body.event, "value") else body.event,
-        recipientPatientId=body.recipientPatientId,
-        recipientGuardianId=body.recipientGuardianId,
-        recipientAddress=body.recipientAddress,
-        message=body.message,
-        sentAt=datetime.utcnow() if success else None,
-        status="SENT" if success else "ERROR",
-        prescriptionId=body.prescriptionId,
-    )
-    db.add(record)
-    db.commit()
-    return created(_serialize(record))
+    # dos envíos concurrentes pueden calcular el mismo ID; se reintenta el registro
+    for _ in range(3):
+        record = Notification(
+            id=next_id(db, Notification.id, "NTF-"),
+            type=body.type.value if hasattr(body.type, "value") else body.type,
+            event=body.event.value if hasattr(body.event, "value") else body.event,
+            recipientPatientId=body.recipientPatientId,
+            recipientGuardianId=body.recipientGuardianId,
+            recipientAddress=body.recipientAddress,
+            message=body.message,
+            sentAt=datetime.utcnow() if success else None,
+            status="SENT" if success else "ERROR",
+            prescriptionId=body.prescriptionId,
+        )
+        db.add(record)
+        try:
+            db.commit()
+            return created(_serialize(record))
+        except IntegrityError:
+            db.rollback()
+    raise HTTPException(409, detail={
+        "code": "CONFLICT",
+        "message": "No se pudo registrar la notificación; reintenta la operación",
+    })
 
 
 @router.get("")
@@ -91,6 +98,5 @@ def get_notification(
 ):
     n = db.get(Notification, notification_id)
     if not n:
-        from fastapi import HTTPException
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Notificación no encontrada"})
     return ok(_serialize(n))

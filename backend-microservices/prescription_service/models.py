@@ -1,9 +1,4 @@
-"""Modelos SQLAlchemy 2.0 de PrescriptionService.
-
-Solo las tablas propias del servicio: prescriptions y prescription_items.
-Las columnas usan camelCase para igualar las claves JSON del contrato/seed.
-Referencias a USR-*/PAT-*/MED-* son IDs externos (sin FK cruzada entre servicios).
-"""
+"""Columnas en camelCase para calzar con el JSON; USR-*/PAT-*/MED-* son ids externos."""
 
 from datetime import date
 
@@ -26,7 +21,6 @@ class Prescription(Base):
     durationDays: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String, index=True)
     nextScheduledDelivery: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # Campos extra fuera-de-schema del original, persistidos:
     externalPurchaseNotes: Mapped[str | None] = mapped_column(String, nullable=True)
     cancelReason: Mapped[str | None] = mapped_column(String, nullable=True)
     delivery: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

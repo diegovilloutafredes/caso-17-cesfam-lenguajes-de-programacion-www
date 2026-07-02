@@ -1,14 +1,18 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const { login } = useAuth()
+  const { token, user: sessionUser, login } = useAuth()
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  if (token) {
+    return <Navigate to={sessionUser?.role === 'doctor' ? '/medico' : '/farmacia'} replace />
+  }
 
   async function submit(e, presetUser) {
     if (e?.preventDefault) e.preventDefault()
@@ -67,7 +71,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Insertar contraseña"
+              placeholder="Ingresa tu contraseña"
               autoComplete="current-password"
             />
           </div>

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Instalación SIN Docker — usa Python venv local.
-# Pre-requisito: Python 3.11+ (no 3.13 por hashlib issues).
-# Cuando termine, ejecutá ./run-local.sh para arrancar los 7 servicios.
+# Instalación sin Docker, con venv local.
+# Requiere Python 3.11+ (3.13 tiene problemas con hashlib).
+# Cuando termine, ejecuta ./run-local.sh para iniciar los 7 servicios.
 
 set -e
 cd "$(dirname "$0")"
@@ -40,4 +40,4 @@ pip install -r requirements.txt --quiet
 echo "✓ Dependencias instaladas"
 
 echo
-echo "✓ Instalación local completa. Arrancá los 7 servicios con: ./run-local.sh"
+echo "✓ Instalación local completa. Inicia los 7 servicios con: ./run-local.sh"

@@ -16,7 +16,6 @@ class LoginBody(BaseModel):
 
 @router.post("/login")
 def login(body: LoginBody):
-    """Login passthrough — el gateway delega en IdentityService."""
     response = identity_client.login(body.username, body.password)
     if response.get("error"):
         return JSONResponse(

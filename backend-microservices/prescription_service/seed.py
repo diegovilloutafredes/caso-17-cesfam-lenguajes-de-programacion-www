@@ -1,10 +1,4 @@
-"""Seed local de PrescriptionService. Solo conoce recetas.
-Referencias a USR-* y PAT-* y MED-* son IDs externos (live en otros servicios).
-
-Las recetas READY_FOR_PICKUP retienen stock reservado en InventoryService (MED-0001=21,
-MED-0004=14, MED-0008=120, MED-0009=30). Las RESERVED no reservan stock: la reserva real
-ocurre al pasar a READY (mark-available).
-"""
+"""Los reservados del seed de inventario deben calzar con las recetas READY_FOR_PICKUP."""
 
 from datetime import date
 
@@ -169,7 +163,6 @@ _SEED_PRESCRIPTIONS = [
 
 
 def seed() -> None:
-    """Inserta las recetas del seed solo si la tabla está vacía (idempotente)."""
     db: Session = SessionLocal()
     try:
         if db.execute(select(Prescription.id).limit(1)).first() is not None:

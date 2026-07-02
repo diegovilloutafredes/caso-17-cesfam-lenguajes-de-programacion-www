@@ -1,5 +1,3 @@
-"""IdentityService — autenticación de usuarios del sistema CESFAM."""
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

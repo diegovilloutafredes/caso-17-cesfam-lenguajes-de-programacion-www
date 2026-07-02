@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Autenticación"])
 
 @router.post("/login")
 def login(body: LoginRequest, db: Session = Depends(get_session)):
-    """Sandbox login: cualquier credencial es aceptada. Retorna token stub."""
+    """Login sandbox: acepta cualquier credencial."""
     user = db.execute(
         select(User).where(User.username == body.username)
     ).scalar_one_or_none() or db.execute(
@@ -33,11 +33,9 @@ def me(user: dict = Depends(current_user), db: Session = Depends(get_session)):
 
 @router.post("/validate")
 def validate_token(user: dict = Depends(current_user)):
-    """Endpoint para otros servicios — valida el token y retorna info del user."""
     return ok(user)
 
 
 @router.post("/logout")
 def logout(_user: dict = Depends(current_user)):
-    """Cierra sesión. En sandbox solo registra el evento."""
     return ok({"message": "Sesión cerrada"})

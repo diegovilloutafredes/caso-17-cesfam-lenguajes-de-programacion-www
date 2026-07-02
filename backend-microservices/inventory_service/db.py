@@ -1,5 +1,3 @@
-"""Capa de persistencia de InventoryService (PostgreSQL propio, SQLAlchemy 2.0 síncrono)."""
-
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from shared.db import build_session_factory

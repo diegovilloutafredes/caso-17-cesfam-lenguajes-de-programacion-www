@@ -1,11 +1,3 @@
-"""Proxy genérico del BFF: reenvía cada prefijo de dominio al servicio dueño.
-
-El frontend usa una sola base URL (el gateway, :8000). Para los endpoints que NO
-son agregadores (login y dashboards tienen sus propias rutas), este proxy reenvía
-la petición tal cual (método, path, query, body y token) al servicio correspondiente
-y devuelve su respuesta sin alterar el envelope. Maneja JSON y texto plano (reportes).
-"""
-
 import os
 
 import httpx
@@ -13,7 +5,6 @@ from fastapi import APIRouter, Request, Response
 
 router = APIRouter(tags=["BFF Proxy"])
 
-# Prefijo de path → URL base del servicio dueño.
 PROXY_MAP = {
     "patients": os.getenv("PATIENT_SERVICE_URL", "http://localhost:8002"),
     "medications": os.getenv("INVENTORY_SERVICE_URL", "http://localhost:8003"),
@@ -67,8 +58,7 @@ def _make_proxy(base_url: str):
     return proxy
 
 
-# Registra una ruta catch-all por prefijo. Se monta DESPUÉS de auth/dashboards en
-# main.py, así las rutas específicas (login, dashboards) ganan al matchear.
+# se monta después de auth/dashboards (ver main.py)
 for _prefix, _base in PROXY_MAP.items():
     router.add_api_route(
         f"/api/v1/{_prefix}{{rest:path}}",

@@ -1,11 +1,6 @@
 @import "tailwindcss";
 
-/* ============================================================
-   Sistema de diseño CESFAM — tokens y componentes
-   Portado del prototipo (tokens provenientes de Figma) para
-   mantener fidelidad 1:1 con el diseño (C5). Tailwind queda
-   disponible para utilidades de layout en los componentes.
-   ============================================================ */
+/* tokens y componentes portados del prototipo */
 
 :root {
   --primary: #0D8CE8;

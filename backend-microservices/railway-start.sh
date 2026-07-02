@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-# Arranque del backend CESFAM como UN servicio en Railway: los 7 procesos uvicorn
-# co-locados en un contenedor. Los 6 servicios de dominio escuchan en localhost; el
-# gateway es el único público (0.0.0.0:$PORT). Las llamadas inter-servicio van por
-# HTTP localhost, así que no aplica la red privada IPv6 de Railway.
-#
-# Supervisión: si cualquiera de los 7 procesos termina, el script sale con error y
-# Railway (restartPolicyType ON_FAILURE) reinicia todo el contenedor; el trap propaga
-# el apagado a los 7. Requiere bash (wait -n no existe en sh/dash).
+# Arranque en Railway: los 7 procesos uvicorn en un contenedor, solo el gateway
+# es público. Requiere bash (wait -n no existe en sh/dash).
 set -eu
 
 : "${PGHOST:?falta PGHOST (referencia a la base Postgres de Railway)}"
@@ -15,8 +9,7 @@ set -eu
 PGPORT="${PGPORT:-5432}"
 PGBASE="postgresql+psycopg2://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}"
 
-# 1) Esperar a Postgres y crear las 5 bases (Database per Service) si faltan.
-#    Railway entrega un Postgres con una sola base; acá se crean las demás.
+# espera Postgres y crea las bases que falten (Railway trae una sola)
 python - <<'PY'
 import os, time, psycopg2
 dsn = dict(host=os.environ["PGHOST"], port=int(os.environ.get("PGPORT", "5432")),
@@ -41,7 +34,7 @@ for db in ("identity_db", "patient_db", "inventory_db", "prescription_db", "noti
 con.close()
 PY
 
-# 2) URLs internas: todos los servicios viven en localhost dentro del contenedor.
+# todos los servicios viven en localhost dentro del contenedor
 export IDENTITY_SERVICE_URL="http://127.0.0.1:8001"
 export PATIENT_SERVICE_URL="http://127.0.0.1:8002"
 export INVENTORY_SERVICE_URL="http://127.0.0.1:8003"
@@ -49,10 +42,10 @@ export PRESCRIPTION_SERVICE_URL="http://127.0.0.1:8004"
 export NOTIFICATION_SERVICE_URL="http://127.0.0.1:8005"
 export REPORT_SERVICE_URL="http://127.0.0.1:8006"
 
-# 3) Propagar el apagado (SIGINT/SIGTERM de Railway) a todos los procesos hijos.
+# propaga el apagado a los hijos
 trap 'kill 0' INT TERM
 
-# 4) Cada servicio de dominio en su puerto local con SU propia base; el gateway público.
+# cada servicio con su propia base; solo el gateway es público
 DATABASE_URL="${PGBASE}/identity_db"     uvicorn identity_service.main:app     --host 127.0.0.1 --port 8001 &
 DATABASE_URL="${PGBASE}/patient_db"      uvicorn patient_service.main:app      --host 127.0.0.1 --port 8002 &
 DATABASE_URL="${PGBASE}/inventory_db"    uvicorn inventory_service.main:app    --host 127.0.0.1 --port 8003 &
@@ -61,6 +54,6 @@ DATABASE_URL="${PGBASE}/notification_db" uvicorn notification_service.main:app -
 uvicorn report_service.main:app --host 127.0.0.1 --port 8006 &
 uvicorn api_gateway.main:app --host 0.0.0.0 --port "${PORT:-8000}" &
 
-# 5) Si cualquiera de los 7 procesos termina, reiniciar todo el contenedor (ON_FAILURE).
+# si un proceso muere, el script sale con error y Railway reinicia el contenedor
 wait -n || true
 exit 1

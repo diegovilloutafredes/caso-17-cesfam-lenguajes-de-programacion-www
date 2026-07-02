@@ -1,8 +1,4 @@
-"""Fixtures para los tests de integración cross-service.
-
-Los tests corren contra el sistema levantado (docker-compose), entrando por el
-ApiGateway (BFF). La URL se toma de GATEWAY_URL (default localhost:8000).
-"""
+"""Requieren el stack corriendo (make up); URL en GATEWAY_URL."""
 
 import os
 

@@ -36,7 +36,6 @@ def generate_report(
     _user: dict = Depends(current_user),
     token: str = Depends(current_token),
 ):
-    """Genera informe CSV. Consulta InventoryService y PrescriptionService según tipo."""
     rows: list[list[str]] = []
 
     def _check(resp: dict) -> dict:
@@ -83,14 +82,13 @@ def generate_report(
         for m in meds:
             batches_resp = inventory_client.list_batches(m["id"], token=token)
             batches = batches_resp.get("data") or []
-            expired = [b for b in batches if b.get("expirationDate", "9999") <= today]
+            expired = [b for b in batches if b.get("expirationDate", "9999") < today]
             if expired:
                 rows.append([
                     m["id"], m.get("code", ""),
                     "; ".join(f"{b['batchNumber']}({b['availableQuantity']})" for b in expired),
                 ])
 
-    # csv.writer escapa comas, comillas y saltos de línea en los campos de texto libre.
     out = io.StringIO()
     csv.writer(out).writerows(rows)
     return out.getvalue()

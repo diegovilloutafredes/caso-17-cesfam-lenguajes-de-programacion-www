@@ -2,7 +2,7 @@ import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -32,8 +32,6 @@ notification_client = NotificationServiceClient()
 
 
 def _serialize(r: Prescription) -> dict:
-    """Serializa al contrato JSON. Los campos condicionales (`delivery`,
-    `externalPurchaseNotes`, `cancelReason`) solo se incluyen en su estado."""
     out = {
         "id": r.id,
         "doctorId": r.doctorId,
@@ -72,7 +70,7 @@ def _ensure_status(r: Prescription, allowed: set, action: str) -> None:
     if r.status not in allowed:
         raise HTTPException(409, detail={
             "code": "INVALID_STATE",
-            "message": f"No se puede '{action}' en estado {r.status}",
+            "message": f"No se puede {action} una receta en estado {r.status}",
         })
 
 
@@ -81,7 +79,6 @@ def _has_error(response: dict) -> bool:
 
 
 def _get_locked(db: Session, prescription_id: str) -> Optional[Prescription]:
-    """Carga la receta con bloqueo de fila para serializar transiciones concurrentes."""
     return db.execute(
         select(Prescription)
         .where(Prescription.id == prescription_id)
@@ -90,11 +87,7 @@ def _get_locked(db: Session, prescription_id: str) -> Optional[Prescription]:
 
 
 def _expire_overdue(db: Session, token: str) -> None:
-    """Pasa a EXPIRED las recetas activas con la fecha límite de retiro vencida.
-
-    La transición es única (no se reintenta): si una liberación de stock falla,
-    se registra la fuga en el log en vez de arriesgar una doble liberación.
-    """
+    """Expira las recetas activas con la fecha límite vencida; una liberación fallida queda en el log."""
     today = date.today()
     overdue = db.execute(
         select(Prescription.id).where(
@@ -103,7 +96,12 @@ def _expire_overdue(db: Session, token: str) -> None:
         )
     ).scalars().all()
     for rid in overdue:
-        r = _get_locked(db, rid)
+        # skip_locked: si otra request ya está expirando esta receta, no se espera
+        r = db.execute(
+            select(Prescription)
+            .where(Prescription.id == rid)
+            .with_for_update(skip_locked=True)
+        ).scalar_one_or_none()
         if not r or r.status not in ACTIVE_STATES or r.pickupDeadline >= today:
             db.rollback()
             continue
@@ -126,8 +124,8 @@ def _expire_overdue(db: Session, token: str) -> None:
 def list_prescriptions(
     status_filter: Optional[str] = None,
     patientId: Optional[str] = None,
-    page: int = 1,
-    limit: int = 20,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=200),
     _: dict = Depends(current_user),
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
@@ -142,7 +140,7 @@ def list_prescriptions(
         stmt = stmt.where(Prescription.patientId == patientId)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     rows = db.execute(
-        stmt.order_by(Prescription.emissionDate.desc())
+        stmt.order_by(Prescription.emissionDate.desc(), Prescription.id.desc())
         .offset(max(0, (page - 1) * limit)).limit(limit)
     ).scalars().all()
     return ok({
@@ -164,7 +162,7 @@ def queue(
     items = db.execute(
         select(Prescription)
         .where(Prescription.status.in_(["SUBMITTED", "RESERVED"]))
-        .order_by(Prescription.emissionDate)
+        .order_by(Prescription.emissionDate, Prescription.id)
     ).scalars().all()
     return ok([_serialize(r) for r in items])
 
@@ -188,7 +186,6 @@ def create_prescription(
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    """Crea receta. Valida que el paciente exista vía PatientService (cross-service)."""
     response = patient_client.get_patient(body.patientId, token=token)
     if _has_error(response):
         err = response["error"]
@@ -253,16 +250,14 @@ def _release_reserved(reserved: list, prescription_id: str, token: str) -> None:
 @router.post("/{prescription_id}/prepare")
 def prepare(
     prescription_id: str,
-    user: dict = Depends(require_role("pharmacy_staff")),
+    _user: dict = Depends(require_role("pharmacy_staff")),
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    """SUBMITTED → READY_FOR_PICKUP. Reserva stock vía InventoryService; si una
-    línea falla, libera (compensa) las ya reservadas."""
     r = _get_locked(db, prescription_id)
     if not r:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Receta no encontrada"})
-    _ensure_status(r, {"SUBMITTED"}, "prepare")
+    _ensure_status(r, {"SUBMITTED"}, "preparar")
 
     reserved: list[tuple[str, int]] = []
     for item in r.items:
@@ -295,11 +290,11 @@ def reserve(
     _: dict = Depends(require_role("pharmacy_staff")),
     db: Session = Depends(get_session),
 ):
-    """SUBMITTED → RESERVED. Sin movimiento de stock (no hay disponible aún)."""
+    """No mueve stock; la reserva ocurre al pasar a READY."""
     r = _get_locked(db, prescription_id)
     if not r:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Receta no encontrada"})
-    _ensure_status(r, {"SUBMITTED"}, "reserve")
+    _ensure_status(r, {"SUBMITTED"}, "reservar")
     r.status = "RESERVED"
     db.commit()
     return ok(_serialize(r))
@@ -308,15 +303,14 @@ def reserve(
 @router.post("/{prescription_id}/mark-available")
 def mark_available(
     prescription_id: str,
-    user: dict = Depends(require_role("pharmacy_staff")),
+    _user: dict = Depends(require_role("pharmacy_staff")),
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    """RESERVED → READY_FOR_PICKUP. Reserva stock + notifica al paciente vía NotificationService."""
     r = _get_locked(db, prescription_id)
     if not r:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Receta no encontrada"})
-    _ensure_status(r, {"RESERVED"}, "mark-available")
+    _ensure_status(r, {"RESERVED"}, "marcar disponible")
 
     reserved: list[tuple[str, int]] = []
     for item in r.items:
@@ -364,7 +358,7 @@ def external_purchase(
     r = _get_locked(db, prescription_id)
     if not r:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Receta no encontrada"})
-    _ensure_status(r, {"SUBMITTED"}, "external-purchase")
+    _ensure_status(r, {"SUBMITTED"}, "registrar compra externa para")
     r.status = "EXTERNAL_PURCHASE"
     r.externalPurchaseNotes = body.notes
     db.commit()
@@ -378,11 +372,6 @@ def cancel(
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    """Estado activo → CANCELLED. Si tenía stock reservado (READY), lo libera.
-
-    Si la liberación falla (InventoryService caído) no cancela, para no romper la
-    invariante de stock; se reintenta cuando el servicio vuelva.
-    """
     r = _get_locked(db, prescription_id)
     if not r:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Receta no encontrada"})
@@ -425,11 +414,15 @@ def deliver(
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    """READY_FOR_PICKUP → PICKED_UP. Consume physical stock vía InventoryService."""
     r = _get_locked(db, prescription_id)
     if not r:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Receta no encontrada"})
-    _ensure_status(r, {"READY_FOR_PICKUP"}, "deliver")
+    _ensure_status(r, {"READY_FOR_PICKUP"}, "entregar")
+    if r.pickupDeadline < date.today():
+        raise HTTPException(409, detail={
+            "code": "INVALID_STATE",
+            "message": f"La receta venció el {r.pickupDeadline.isoformat()}; no se puede entregar",
+        })
 
     if body.pickerType == "guardian":
         if not body.guardianId:
@@ -452,13 +445,13 @@ def deliver(
             "message": "thirdPartyRut y thirdPartyName requeridos",
         })
 
-    # Las partidas entregadas deben sumar lo recetado (entrega completa, no parcial).
+    # la entrega debe ser total
     required = sum(it.totalQuantity for it in r.items)
     provided = sum(b.quantity for b in body.batches)
     if provided != required:
         raise HTTPException(400, detail={
             "code": "QUANTITY_MISMATCH",
-            "message": f"Las partidas ({provided}) no calzan con lo recetado ({required})",
+            "message": f"Las partidas ({provided}) no coinciden con lo recetado ({required})",
         })
 
     response = inventory_client.consume(
@@ -471,6 +464,7 @@ def deliver(
         raise HTTPException(response.get("statusCode", 409), detail={
             "code": err.get("code", "CONSUME_FAILED"),
             "message": err.get("message"),
+            "details": err.get("details"),
         })
 
     r.status = "PICKED_UP"
@@ -482,5 +476,12 @@ def deliver(
         "batches": [b.model_dump() for b in body.batches],
         "deliveryDate": date.today().isoformat(),
     }
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        logger.error(
+            "Receta %s: stock consumido pero la entrega no quedó registrada; conciliar a mano",
+            prescription_id,
+        )
+        raise
     return ok(_serialize(r))

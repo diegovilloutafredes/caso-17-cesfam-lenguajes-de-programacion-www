@@ -1,9 +1,3 @@
-"""BFF: arma los dashboards de médico y farmacia en una sola llamada.
-
-Médico: estado de las recetas y pacientes recientes. Farmacia: stock, demanda y cola.
-Combina datos de inventory, patient y prescription.
-"""
-
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 
@@ -63,7 +57,6 @@ _DEMAND_EXCLUDED = {"CANCELLED", "EXPIRED"}
 
 
 def _window(days: int) -> tuple:
-    """Ventana de N días: (corte ISO o None si es todo el histórico, descriptor para el panel)."""
     if not days or days <= 0:
         return None, {"days": 0, "from": None, "to": None}
     today = date.today()
@@ -72,7 +65,6 @@ def _window(days: int) -> tuple:
 
 
 def _top_medications(prescriptions: list, med_name: dict, cutoff) -> list:
-    """Unidades recetadas por medicamento en la ventana, sin contar anuladas ni vencidas."""
     demand: dict = defaultdict(int)
     for p in prescriptions:
         if p.get("status") in _DEMAND_EXCLUDED:
@@ -93,7 +85,6 @@ def doctor_dashboard(
     _user: dict = Depends(current_user),
     token: str = Depends(current_token),
 ):
-    """Médico (clínico): estado de las recetas + pacientes con actividad reciente."""
     prescriptions = _as_list(prescription_client.list_all(token=token))
 
     counts = Counter(p.get("status") for p in prescriptions)
@@ -102,8 +93,7 @@ def doctor_dashboard(
         for s in _PRESCRIPTION_STATES if counts.get(s, 0) > 0
     ]
 
-    # reciente = paciente con la última receta emitida más nueva (no por id);
-    # los pacientes sin recetas no aparecen.
+    # recientes: por fecha de última receta emitida
     last_emission: dict = {}
     for p in prescriptions:
         pid, emitted = p.get("patientId"), p.get("emissionDate")
@@ -127,7 +117,6 @@ def pharmacy_dashboard(
     _user: dict = Depends(current_user),
     token: str = Depends(current_token),
 ):
-    """Farmacia (inventario/operación): KPIs + cola + stock + demanda (top recetados)."""
     queue_data = _as_list(prescription_client.queue(token=token))
     pending_resp = prescription_client.list_by_status("SUBMITTED", token=token)
     reserved_resp = prescription_client.list_by_status("RESERVED", token=token)
@@ -137,7 +126,6 @@ def pharmacy_dashboard(
 
     med_name = {m["id"]: m["description"] for m in meds}
 
-    # Top recetados de los últimos 90 días por defecto; el selector del panel pide otras ventanas.
     cutoff, window = _window(_DEFAULT_TOP_DAYS)
     top_medications = _top_medications(prescriptions, med_name, cutoff)
 
@@ -172,7 +160,7 @@ def pharmacy_top_medications(
     _user: dict = Depends(current_user),
     token: str = Depends(current_token),
 ):
-    """Top recetados en una ventana de tiempo (días); days=0 = todo el histórico."""
+    """days=0 abarca todo el histórico."""
     prescriptions = _as_list(prescription_client.list_all(token=token))
     meds = _as_list(inventory_client.list_medications(token=token, limit=50))
     med_name = {m["id"]: m["description"] for m in meds}

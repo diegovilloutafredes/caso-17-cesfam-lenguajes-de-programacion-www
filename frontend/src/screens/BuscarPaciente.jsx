@@ -76,8 +76,7 @@ export default function BuscarPaciente() {
     setPage(1)
   }
 
-  // Invalida respuestas tardías: si se cerró el modal o se pidió otro paciente,
-  // la carga en vuelo se descarta en vez de reabrirlo.
+  // descarta respuestas tardías para que el modal no se reabra solo
   const infoReqRef = useRef(0)
 
   async function openInfo(patientId) {
@@ -152,7 +151,7 @@ export default function BuscarPaciente() {
                   <td>{p.rut}</td>
                   <td>
                     <button className="btn btn-primary btn-sm" onClick={() => openInfo(p.id)}>
-                      Ver info
+                      Ver detalle
                     </button>
                   </td>
                 </tr>

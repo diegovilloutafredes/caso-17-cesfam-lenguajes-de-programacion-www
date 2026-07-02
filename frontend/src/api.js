@@ -1,19 +1,16 @@
 import axios from 'axios'
 
-// Una sola base URL: el ApiGateway (BFF). En local :8000, en cloud el desplegado.
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const api = axios.create({ baseURL: API_URL })
 
-// Adjunta el token de sesión a cada request.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('cesfam_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// Desenvuelve el envelope ApiResponse: en éxito devuelve `data`; en error normaliza
-// el código/mensaje del backend a un Error. Respuestas no-envueltas (CSV) pasan crudas.
+// desenvuelve el envelope: los llamados reciben data directo
 api.interceptors.response.use(
   (resp) => {
     const body = resp.data
@@ -90,7 +87,6 @@ export const dashboardsApi = {
   pharmacyTopMedications: (days) => api.get('/api/v1/pharmacy/top-medications', { params: { days } }),
 }
 
-// Reportes devuelven CSV (texto plano), no envelope.
 export const reportsApi = {
   generate: (reportType, dateFrom, dateTo) =>
     api.post('/api/v1/reports', { reportType, dateFrom, dateTo }, { responseType: 'text' }),

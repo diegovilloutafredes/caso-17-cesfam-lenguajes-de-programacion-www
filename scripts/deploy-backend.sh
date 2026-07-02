@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CESFAM — despliega el backend a la nube (Railway) desde local, sin push a GitHub.
-# Requiere 'railway login' (la sesión vive en ~/.railway, FUERA del repo). No hay
+# Requiere 'railway login' (la sesión vive en ~/.railway, fuera del repo). No hay
 # secretos en el repo: las claves (Postgres, etc.) son variables del servicio en Railway.
 set -euo pipefail
 

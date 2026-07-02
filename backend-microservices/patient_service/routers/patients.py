@@ -1,7 +1,8 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from patient_service.clients.prescription import PrescriptionServiceClient
@@ -32,7 +33,7 @@ def _serialize_guardian(g: Guardian) -> dict:
 
 
 def _serialize_patient(p: Patient) -> dict:
-    """Paciente SIN guardians (lista). PatientCard embebido → objeto anidado."""
+    """Versión para listados, sin guardians."""
     out = {
         "id": p.id,
         "rut": p.rut,
@@ -62,22 +63,23 @@ def _hydrate(p: Patient) -> dict:
 @router.get("")
 def list_patients(
     search: Optional[str] = None,
-    page: int = 1,
-    limit: int = 20,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=200),
     _: dict = Depends(current_user),
     db: Session = Depends(get_session),
 ):
     stmt = select(Patient)
     if search:
-        like = f"%{search}%"
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{escaped}%"
         stmt = stmt.where(or_(
-            Patient.firstName.ilike(like),
-            Patient.lastName.ilike(like),
-            Patient.rut.ilike(like),
+            Patient.firstName.ilike(like, escape="\\"),
+            Patient.lastName.ilike(like, escape="\\"),
+            Patient.rut.ilike(like, escape="\\"),
         ))
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     rows = db.execute(
-        stmt.order_by(Patient.lastName, Patient.firstName)
+        stmt.order_by(Patient.lastName, Patient.firstName, Patient.id)
         .offset(max(0, (page - 1) * limit)).limit(limit)
     ).scalars().all()
     return ok({
@@ -139,10 +141,7 @@ def get_history(
     token: str = Depends(current_token),
     db: Session = Depends(get_session),
 ):
-    """Libreta del paciente: sus datos locales más las recetas de prescription_service.
-
-    Si ese servicio no responde, devuelve al paciente con las listas vacías.
-    """
+    """Si prescription_service no responde, entrega las listas vacías."""
     p = db.get(Patient, patient_id)
     if not p:
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Paciente no encontrado"})
@@ -184,23 +183,31 @@ def add_guardian(
 ):
     if not db.get(Patient, patient_id):
         raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Paciente no encontrado"})
-    new_id = next_id(db, Guardian.id, "GRD-")
     payload = body.model_dump(mode="json")
-    g = Guardian(
-        id=new_id,
-        patientId=patient_id,
-        rut=body.rut,
-        firstName=body.firstName,
-        lastName=body.lastName,
-        phone=body.phone,
-        email=body.email,
-        relationship_=body.relationship,
-        authorizationDate=body.authorizationDate,
-    )
-    db.add(g)
-    db.commit()
-    rec = {"id": new_id, "patientId": patient_id, **payload}
-    return created(rec)
+    # dos altas concurrentes pueden calcular el mismo ID; se reintenta
+    for _ in range(3):
+        new_id = next_id(db, Guardian.id, "GRD-")
+        g = Guardian(
+            id=new_id,
+            patientId=patient_id,
+            rut=body.rut,
+            firstName=body.firstName,
+            lastName=body.lastName,
+            phone=body.phone,
+            email=body.email,
+            relationship_=body.relationship,
+            authorizationDate=body.authorizationDate,
+        )
+        db.add(g)
+        try:
+            db.commit()
+            return created({"id": new_id, "patientId": patient_id, **payload})
+        except IntegrityError:
+            db.rollback()
+    raise HTTPException(409, detail={
+        "code": "CONFLICT",
+        "message": "No se pudo asignar un ID de apoderado; reintenta la operación",
+    })
 
 
 @router.delete("/{patient_id}/guardians/{guardian_id}")

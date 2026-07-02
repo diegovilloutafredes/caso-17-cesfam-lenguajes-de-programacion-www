@@ -25,8 +25,6 @@ class BatchWriteOff(BaseModel):
     notes: Optional[str] = None
 
 
-# --- Inter-service operations (llamadas por PrescriptionService) ---
-
 class StockReserveRequest(BaseModel):
     quantity: int = Field(gt=0)
 
@@ -47,4 +45,4 @@ class ExpectedItem(BaseModel):
 
 class ConsumeRequest(BaseModel):
     allocations: List[BatchAllocation] = Field(min_length=1)
-    expectedItems: Optional[List[ExpectedItem]] = None
+    expectedItems: List[ExpectedItem] = Field(min_length=1)

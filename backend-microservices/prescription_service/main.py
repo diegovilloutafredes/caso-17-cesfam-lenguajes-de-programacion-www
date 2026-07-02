@@ -1,5 +1,3 @@
-"""PrescriptionService — recetas, state machine y orquestación de inventory + notification."""
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

@@ -1,5 +1,3 @@
-"""PatientService — datos de pacientes y apoderados."""
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

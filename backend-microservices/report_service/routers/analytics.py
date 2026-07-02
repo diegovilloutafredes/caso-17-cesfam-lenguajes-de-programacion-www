@@ -1,10 +1,4 @@
-"""Analítica de reportería (C8): tendencia de prescripciones en el tiempo.
-
-Calcula la serie diaria de emisiones y entregas a partir de las recetas
-(consultadas a PrescriptionService), con relleno de días sin actividad (zero-fill).
-El campo `reserve` se mantiene en la forma del contrato pero queda en 0 porque el
-estado RESERVED no lleva timestamp asociado.
-"""
+"""reserve queda en 0: RESERVED no tiene timestamp."""
 
 from datetime import date, timedelta
 from typing import Optional
@@ -43,7 +37,7 @@ def prescription_trend(
         })
 
     resp = prescription_client.list_all(token=token)
-    rows = ((resp.get("data") or {}).get("data")) or []
+    rows = resp.get("data") or []
 
     emission: dict[date, int] = {}
     delivery: dict[date, int] = {}

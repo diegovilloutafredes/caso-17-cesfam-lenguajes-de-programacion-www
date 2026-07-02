@@ -3,17 +3,22 @@ import { useEffect, useRef } from 'react'
 // Con modales apilados, Escape debe cerrar solo el de más arriba.
 const openModals = []
 
-// Modal reutilizable: backdrop, cierre con Escape y click afuera.
 export default function Modal({ open, onClose, title, subtitle, children, actions, large = false }) {
   const idRef = useRef({})
   const boxRef = useRef(null)
+  // el efecto depende solo de `open`: si dependiera de onClose (inestable en los
+  // call sites), cada tecla re-suscribiría y el focus() le robaría el foco al input
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   useEffect(() => {
     if (!open) return
     const id = idRef.current
     openModals.push(id)
     const onKey = (e) => {
-      if (e.key === 'Escape' && openModals[openModals.length - 1] === id) onClose()
+      if (e.key === 'Escape' && openModals[openModals.length - 1] === id) onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
     boxRef.current?.focus()
@@ -22,7 +27,7 @@ export default function Modal({ open, onClose, title, subtitle, children, action
       if (i >= 0) openModals.splice(i, 1)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 

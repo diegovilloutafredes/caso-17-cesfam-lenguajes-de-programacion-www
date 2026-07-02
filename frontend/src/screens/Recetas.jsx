@@ -30,6 +30,7 @@ export default function Recetas() {
   const [pickup, setPickup] = useState(null)
   const [cancelRx, setCancelRx] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling] = useState(false)
 
   // La receta solo trae ids; los nombres salen de estos catálogos.
   const [patientsById, setPatientsById] = useState({})
@@ -127,9 +128,17 @@ export default function Recetas() {
       showToast('Falta el motivo', 'Indica el motivo de la anulación.', 'warning')
       return
     }
-    const rx = cancelRx
-    setCancelRx(null)
-    await runAction(rx.id, () => prescriptionsApi.cancel(rx.id, { reason: cancelReason.trim() }), 'Receta anulada')
+    setCancelling(true)
+    try {
+      await prescriptionsApi.cancel(cancelRx.id, { reason: cancelReason.trim() })
+      showToast('Receta anulada', `Receta ${cancelRx.id} actualizada.`, 'success')
+      setCancelRx(null)
+      await load(chip)
+    } catch (err) {
+      showToast('No se pudo anular', err.message, 'danger')
+    } finally {
+      setCancelling(false)
+    }
   }
 
   return (
@@ -265,11 +274,11 @@ export default function Recetas() {
         subtitle={cancelRx ? `Receta ${cancelRx.id} · ${patientLabel(cancelRx)}` : ''}
         actions={
           <>
-            <button className="btn btn-outline" onClick={() => setCancelRx(null)}>
+            <button className="btn btn-outline" onClick={() => setCancelRx(null)} disabled={cancelling}>
               Cancelar
             </button>
-            <button className="btn btn-danger" onClick={submitCancel}>
-              Anular receta
+            <button className="btn btn-danger" onClick={submitCancel} disabled={cancelling}>
+              {cancelling ? 'Anulando…' : 'Anular receta'}
             </button>
           </>
         }

@@ -1,9 +1,4 @@
-"""Auth stub compartido por los servicios.
-
-Acepta cualquier Bearer y devuelve un usuario stub; en producción cada servicio
-validaría el JWT. Un token sandbox-token-USR-XXX resuelve a ese usuario (para probar
-flujos por rol); cualquier otro Bearer cae al doctor USR-001.
-"""
+"""sandbox-token-USR-XXX resuelve a ese usuario; cualquier otro Bearer cae a USR-001."""
 
 from typing import Optional
 
@@ -14,15 +9,14 @@ bearer_scheme = HTTPBearer(
     auto_error=False,
     description=(
         "Sandbox: cualquier valor Bearer es aceptado. "
-        "Para testear como un usuario específico, usar el token de su login: "
+        "Para probar como un usuario específico, usar el token de su login: "
         "'sandbox-token-USR-001' (doctor), 'sandbox-token-USR-002' (pharmacy_staff), "
-        "'sandbox-token-USR-003' (doctor). Otro valor → default doctor."
+        "'sandbox-token-USR-003' (doctor). Cualquier otro valor cae al doctor por defecto."
     ),
 )
 
 
-# Espejo de los usuarios del seed de identity_service, para resolver el usuario
-# sin llamar a ese servicio en cada request.
+# debe calzar con el seed de identity_service
 KNOWN_USERS = {
     "USR-001": {
         "id": "USR-001",
@@ -43,7 +37,7 @@ KNOWN_USERS = {
     "USR-003": {
         "id": "USR-003",
         "username": "dralopez",
-        "rut": "13.555.444-3",
+        "rut": "13.555.444-8",
         "fullName": "Dra. Ana López",
         "email": "ana.lopez@cesfam.cl",
         "role": "doctor",
@@ -55,7 +49,6 @@ _TOKEN_PREFIX = "sandbox-token-"
 
 
 def _resolve_user_from_token(token: str) -> dict:
-    """Mapea token → usuario. `sandbox-token-USR-XXX` resuelve al usuario; otros → default."""
     if token.startswith(_TOKEN_PREFIX):
         user_id = token[len(_TOKEN_PREFIX):]
         if user_id in KNOWN_USERS:
@@ -77,7 +70,6 @@ def current_user(
 def current_token(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
 ) -> str:
-    """Devuelve el token raw para reenviarlo a otros servicios."""
     if not creds or not creds.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

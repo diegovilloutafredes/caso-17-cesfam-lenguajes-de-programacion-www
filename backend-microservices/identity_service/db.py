@@ -1,5 +1,3 @@
-"""Almacén PostgreSQL de IdentityService (Database per Service, SQLAlchemy 2.0 síncrono)."""
-
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from shared.db import build_session_factory

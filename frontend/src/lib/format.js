@@ -1,5 +1,3 @@
-// Mapeos de estado → etiqueta + clase de badge (fieles al prototipo).
-
 export const PRESCRIPTION_STATUS = {
   SUBMITTED: { label: 'Ingresado', badge: 'info' },
   RESERVED: { label: 'Reservado', badge: 'warning' },

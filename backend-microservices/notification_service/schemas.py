@@ -39,6 +39,6 @@ class NotificationCreate(BaseModel):
     event: NotificationEvent
     recipientPatientId: Optional[str] = None
     recipientGuardianId: Optional[str] = None
-    recipientAddress: str  # phone o email; caller (PrescriptionService) lo resuelve via PatientService
+    recipientAddress: str  # phone o email
     message: str
     prescriptionId: Optional[str] = None

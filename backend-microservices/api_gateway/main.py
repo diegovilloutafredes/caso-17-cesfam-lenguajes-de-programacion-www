@@ -1,9 +1,3 @@
-"""ApiGateway (BFF): entrada única del frontend.
-
-Reenvía el login a IdentityService y arma los dashboards de médico y farmacia;
-el resto de los endpoints los pasa el proxy a cada servicio.
-"""
-
 import os
 
 from fastapi import FastAPI
@@ -15,8 +9,7 @@ from shared.errors import register_envelope_handler
 app = FastAPI(title="ApiGateway (BFF)", version="1.0.0")
 register_envelope_handler(app)
 
-# CORS en el BFF (única entrada del frontend). Auth Bearer en header (sin cookies),
-# por eso allow_credentials=False y se acepta el wildcard.
+# token por header, sin cookies; el wildcard es seguro
 _cors = os.getenv("CORS_ORIGINS", "*").strip()
 _origins = ["*"] if _cors == "*" else [o.strip() for o in _cors.split(",") if o.strip()]
 app.add_middleware(
@@ -29,7 +22,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(dashboards.router)
-# El proxy catch-all va al final: las rutas específicas (login, dashboards) ganan.
+# el proxy va al final para no tapar login/dashboards
 app.include_router(proxy.router)
 
 

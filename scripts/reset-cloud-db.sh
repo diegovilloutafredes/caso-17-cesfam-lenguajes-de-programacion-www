@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CESFAM — resetea el Postgres de la nube (Railway) para volver a aplicar el seed.
 #
-# DESTRUCTIVO: borra TODOS los datos del backend en la nube. El seed solo corre con las
+# Destructivo: borra todos los datos del backend en la nube. El seed solo corre con las
 # tablas vacías, así que esto es necesario cuando cambian los datos del seed. Tras correrlo,
 # redesplegar (./scripts/deploy-backend.sh) recrea las 5 bases y las vuelve a sembrar.
 #

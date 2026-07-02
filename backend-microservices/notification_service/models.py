@@ -1,9 +1,4 @@
-"""Modelos SQLAlchemy de NotificationService.
-
-Solo la tabla `notifications`. Columnas en camelCase para igualar las claves JSON
-del seed/contrato. `type`/`event`/`status` se almacenan como String (mismas cadenas
-del contrato); `sentAt` como DateTime real (se emite `.isoformat()` al serializar).
-"""
+"""Columnas en camelCase para calzar con el JSON del contrato."""
 
 from datetime import datetime
 from typing import Optional

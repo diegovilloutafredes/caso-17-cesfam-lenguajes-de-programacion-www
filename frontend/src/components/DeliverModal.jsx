@@ -13,7 +13,6 @@ const EMPTY_FORM = {
   quantity: '',
 }
 
-// Modal de retiro compartido por Recetas y Panel Farmacia.
 export default function DeliverModal({ prescription, subtitle, onClose, onDelivered }) {
   const { showToast } = useToast()
   const [form, setForm] = useState(EMPTY_FORM)
@@ -46,7 +45,7 @@ export default function DeliverModal({ prescription, subtitle, onClose, onDelive
           .sort((a, b) => (a.expirationDate || '').localeCompare(b.expirationDate || ''))
         setBatches(list)
         setGuardians(guardianList || [])
-        // La entrega es completa: prellena la cantidad recetada y una partida con stock suficiente.
+        // prellena para entrega completa
         const batch = list.find((b) => b.availableQuantity >= required) || list[0]
         setForm((f) => ({
           ...f,
@@ -69,12 +68,12 @@ export default function DeliverModal({ prescription, subtitle, onClose, onDelive
 
   async function submit() {
     if (!form.batchId) {
-      showToast('Falta la partida', 'Seleccione una partida a entregar.', 'warning')
+      showToast('Falta la partida', 'Selecciona una partida a entregar.', 'warning')
       return
     }
     const qty = Number(form.quantity)
     if (!qty || qty <= 0) {
-      showToast('Cantidad inválida', 'Ingrese la cantidad a entregar.', 'warning')
+      showToast('Cantidad inválida', 'Ingresa la cantidad a entregar.', 'warning')
       return
     }
     const body = {
@@ -83,14 +82,14 @@ export default function DeliverModal({ prescription, subtitle, onClose, onDelive
     }
     if (form.pickerType === 'guardian') {
       if (!form.guardianId) {
-        showToast('Falta el apoderado', 'Seleccione un apoderado autorizado.', 'warning')
+        showToast('Falta el apoderado', 'Selecciona un apoderado autorizado.', 'warning')
         return
       }
       body.guardianId = form.guardianId
     }
     if (form.pickerType === 'third_party') {
       if (!form.thirdPartyRut || !form.thirdPartyName) {
-        showToast('Datos del tercero incompletos', 'Ingrese RUT y nombre del tercero.', 'warning')
+        showToast('Datos del tercero incompletos', 'Ingresa el RUT y el nombre del tercero.', 'warning')
         return
       }
       body.thirdPartyRut = form.thirdPartyRut
@@ -157,7 +156,7 @@ export default function DeliverModal({ prescription, subtitle, onClose, onDelive
             value={form.guardianId}
             onChange={(e) => setForm((f) => ({ ...f, guardianId: e.target.value }))}
           >
-            <option value="">Seleccione apoderado…</option>
+            <option value="">Seleccionar apoderado…</option>
             {guardians.map((g) => (
               <option key={g.id} value={g.id}>
                 {fullName(g)}{g.relationship ? ` (${g.relationship})` : ''}{g.rut ? ` — ${g.rut}` : ''}
@@ -204,9 +203,17 @@ export default function DeliverModal({ prescription, subtitle, onClose, onDelive
         </div>
       </div>
 
+      {batches.length > 0 &&
+        !batches.some((b) => b.availableQuantity >= Number(form.quantity || 0)) && (
+        <p className="text-soft" style={{ color: 'var(--warning-text)', marginTop: 12 }}>
+          Ninguna partida vigente cubre por sí sola la cantidad recetada; la entrega es
+          total, así que primero ingresa stock o anula la receta.
+        </p>
+      )}
+
       <div className="grid grid-2 mt-3">
         <div className="input-group">
-          <label htmlFor="deliver-batch">Partida a entregar (FEFO — vence primero)</label>
+          <label htmlFor="deliver-batch">Partida a entregar (FEFO, vence primero)</label>
           <select
             id="deliver-batch"
             className="select"
@@ -222,15 +229,13 @@ export default function DeliverModal({ prescription, subtitle, onClose, onDelive
           </select>
         </div>
         <div className="input-group">
-          <label htmlFor="deliver-quantity">Cantidad a entregar</label>
+          <label htmlFor="deliver-quantity">Cantidad a entregar (receta completa)</label>
           <input
             id="deliver-quantity"
             className="input"
             type="number"
-            min="1"
-            placeholder="0"
             value={form.quantity}
-            onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
+            readOnly
           />
         </div>
       </div>

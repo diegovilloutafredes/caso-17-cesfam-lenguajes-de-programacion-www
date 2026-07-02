@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CESFAM — despliega el frontend a la nube (Vercel) desde local. Publica el deploy
-# principal (URL estable). Requiere 'vercel login' (sesión en ~/.vercel, FUERA del repo).
+# principal (URL estable). Requiere 'vercel login' (la sesión vive en ~/.vercel, fuera del repo).
 # Sin secretos en el repo: la URL del backend se pasa como build-env.
 set -euo pipefail
 

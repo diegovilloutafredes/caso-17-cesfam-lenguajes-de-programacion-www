@@ -1,8 +1,9 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from inventory_service.db import get_session
@@ -60,18 +61,19 @@ def _stock_status(med: Medication) -> str:
 @router.get("")
 def list_medications(
     search: Optional[str] = None,
-    page: int = 1,
-    limit: int = 20,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
     stmt = select(Medication)
     if search:
-        like = f"%{search}%"
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{escaped}%"
         stmt = stmt.where(or_(
-            Medication.description.ilike(like),
-            Medication.manufacturer.ilike(like),
-            Medication.code.ilike(like),
+            Medication.description.ilike(like, escape="\\"),
+            Medication.manufacturer.ilike(like, escape="\\"),
+            Medication.code.ilike(like, escape="\\"),
         ))
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     rows = db.execute(
@@ -156,29 +158,35 @@ def add_batch(
     db: Session = Depends(get_session),
     _: dict = Depends(require_role("pharmacy_staff")),
 ):
-    med = db.execute(
-        select(Medication).where(Medication.id == medication_id).with_for_update()
-    ).scalar_one_or_none()
-    if not med:
-        raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Medicamento no encontrado"})
-    new_id = next_id(db, Batch.id, "BCH-")
-    batch = Batch(
-        id=new_id,
-        medicationId=medication_id,
-        batchNumber=body.batchNumber,
-        arrivalDate=date.today(),
-        expirationDate=body.expirationDate,
-        initialQuantity=body.initialQuantity,
-        availableQuantity=body.initialQuantity,
-    )
-    db.add(batch)
-    med.availableQuantity += body.initialQuantity
-    med.physicalQuantity += body.initialQuantity
-    db.commit()
-    return created(_serialize_batch(batch))
+    # dos altas concurrentes pueden calcular el mismo ID; se reintenta
+    for _ in range(3):
+        med = db.execute(
+            select(Medication).where(Medication.id == medication_id).with_for_update()
+        ).scalar_one_or_none()
+        if not med:
+            raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "Medicamento no encontrado"})
+        batch = Batch(
+            id=next_id(db, Batch.id, "BCH-"),
+            medicationId=medication_id,
+            batchNumber=body.batchNumber,
+            arrivalDate=date.today(),
+            expirationDate=body.expirationDate,
+            initialQuantity=body.initialQuantity,
+            availableQuantity=body.initialQuantity,
+        )
+        db.add(batch)
+        med.availableQuantity += body.initialQuantity
+        med.physicalQuantity += body.initialQuantity
+        try:
+            db.commit()
+            return created(_serialize_batch(batch))
+        except IntegrityError:
+            db.rollback()
+    raise HTTPException(409, detail={
+        "code": "CONFLICT",
+        "message": "No se pudo asignar un ID de partida; reintenta la operación",
+    })
 
-
-# --- Inter-service operations ---
 
 @router.post("/{medication_id}/reserve")
 def reserve_stock(
@@ -187,7 +195,6 @@ def reserve_stock(
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    """Mueve `quantity` de available → reserved. Llamado por PrescriptionService."""
     med = db.execute(
         select(Medication).where(Medication.id == medication_id).with_for_update()
     ).scalar_one_or_none()
@@ -197,6 +204,21 @@ def reserve_stock(
         raise HTTPException(409, detail={
             "code": "INSUFFICIENT_STOCK",
             "message": f"Stock disponible ({med.availableQuantity}) menor a solicitado ({body.quantity})",
+        })
+    # las unidades de partidas vencidas no son entregables: no se comprometen
+    deliverable = db.execute(
+        select(func.coalesce(func.sum(Batch.availableQuantity), 0)).where(
+            Batch.medicationId == medication_id,
+            Batch.expirationDate >= date.today(),
+        )
+    ).scalar_one()
+    if med.reservedQuantity + body.quantity > deliverable:
+        raise HTTPException(409, detail={
+            "code": "INSUFFICIENT_STOCK",
+            "message": (
+                f"Stock vigente insuficiente: quedan "
+                f"{max(0, deliverable - med.reservedQuantity)} unidades no vencidas sin comprometer"
+            ),
         })
     med.availableQuantity -= body.quantity
     med.reservedQuantity += body.quantity
@@ -211,7 +233,6 @@ def release_stock(
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
-    """Mueve `quantity` de reserved → available. Llamado por PrescriptionService al cancelar."""
     med = db.execute(
         select(Medication).where(Medication.id == medication_id).with_for_update()
     ).scalar_one_or_none()
@@ -264,16 +285,15 @@ def consume_physical(
         med_id = batches[batch_id].medicationId
         per_med[med_id] = per_med.get(med_id, 0) + qty
 
-    if body.expectedItems is not None:
-        expected: dict[str, int] = {}
-        for item in body.expectedItems:
-            expected[item.medicationId] = expected.get(item.medicationId, 0) + item.quantity
-        if per_med != expected:
-            raise HTTPException(409, detail={
-                "code": "ALLOCATION_MISMATCH",
-                "message": "Las partidas asignadas no corresponden a los medicamentos recetados",
-                "details": {"expected": expected, "provided": per_med},
-            })
+    expected: dict[str, int] = {}
+    for item in body.expectedItems:
+        expected[item.medicationId] = expected.get(item.medicationId, 0) + item.quantity
+    if per_med != expected:
+        raise HTTPException(409, detail={
+            "code": "ALLOCATION_MISMATCH",
+            "message": "Las partidas asignadas no corresponden a los medicamentos recetados",
+            "details": {"expected": expected, "provided": per_med},
+        })
 
     meds: dict[str, Medication] = {}
     for med_id in sorted(per_med):

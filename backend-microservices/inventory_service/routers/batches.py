@@ -33,7 +33,6 @@ def write_off(
     db: Session = Depends(get_session),
     user: dict = Depends(require_role("pharmacy_staff")),
 ):
-    """Da de baja unidades de una partida + persiste WriteOff con motivo, qty y staff."""
     batch = db.execute(
         select(Batch).where(Batch.id == batch_id).with_for_update()
     ).scalar_one_or_none()
@@ -53,8 +52,7 @@ def write_off(
             "code": "INSUFFICIENT_STOCK",
             "message": f"La baja ({body.quantity}) excede el disponible ({med.availableQuantity})",
         })
-    # La baja retira físico (vencido/dañado): descuenta disponible y físico. `discard` solo
-    # distingue el registro de auditoría (DISCARDED vs DEDUCTED_FROM_AVAILABLE).
+    # discard solo cambia el status del registro; el descuento es el mismo
     batch.availableQuantity -= body.quantity
     if med:
         med.availableQuantity -= body.quantity

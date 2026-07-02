@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 
 echo "=== Verificando Docker ==="
 if ! command -v docker >/dev/null 2>&1; then
-    echo "✗ Docker no está instalado. Instalalo desde https://www.docker.com/products/docker-desktop"
+    echo "✗ Docker no está instalado. Instálalo desde https://www.docker.com/products/docker-desktop"
     exit 1
 fi
 if ! docker info >/dev/null 2>&1; then

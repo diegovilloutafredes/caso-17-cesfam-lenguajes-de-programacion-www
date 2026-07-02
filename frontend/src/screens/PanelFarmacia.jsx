@@ -25,12 +25,13 @@ export default function PanelFarmacia() {
   const [topDays, setTopDays] = useState(90)
   const topDaysRef = useRef(90) // ventana vigente para los refrescos de load()
   const topReqRef = useRef(0)
+  const loadReqRef = useRef(0)
   const [busyId, setBusyId] = useState(null)
 
   // La cola solo trae patientId; los nombres salen de este catálogo.
   const [patientsById, setPatientsById] = useState({})
 
-  // Modal "Sin stock" (al preparar una prescripción sin existencias).
+  // modal Sin stock
   const [stockRx, setStockRx] = useState(null)
   const [stockAction, setStockAction] = useState('reserve')
   const [externalNotes, setExternalNotes] = useState('')
@@ -48,16 +49,19 @@ export default function PanelFarmacia() {
   }
 
   async function load() {
+    const req = ++loadReqRef.current
     setLoading(true)
     try {
       const d = await dashboardsApi.pharmacy()
+      if (loadReqRef.current !== req) return
       setData(d)
       if (topDaysRef.current === 90) setTopMeds(d.topMedications || [])
       else fetchTop(topDaysRef.current)
     } catch (err) {
+      if (loadReqRef.current !== req) return
       showToast('Error al cargar el panel', err.message, 'danger')
     } finally {
-      setLoading(false)
+      if (loadReqRef.current === req) setLoading(false)
     }
   }
 
@@ -89,11 +93,24 @@ export default function PanelFarmacia() {
     return p ? fullName(p) : rx.patientId
   }
 
+  async function handleMarkAvailable(rx) {
+    setBusyId(rx.id)
+    try {
+      await prescriptionsApi.markAvailable(rx.id)
+      showToast('Marcada disponible', `Receta ${rx.id} lista para retiro.`, 'success')
+      await load()
+    } catch (err) {
+      showToast('No se pudo marcar disponible', err.message, 'danger')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function handlePrepare(rx) {
     setBusyId(rx.id)
     try {
       await prescriptionsApi.prepare(rx.id)
-      showToast('Prescripción preparada', `Prescripción ${rx.id} lista.`, 'success')
+      showToast('Receta preparada', `Receta ${rx.id} lista.`, 'success')
       await load()
     } catch (err) {
       if (err.code === 'INSUFFICIENT_STOCK') {
@@ -111,17 +128,21 @@ export default function PanelFarmacia() {
 
   async function submitStockAction() {
     if (!stockRx) return
+    if (stockAction === 'cancel' && !cancelReason.trim()) {
+      showToast('Falta el motivo', 'Indica el motivo de la anulación.', 'warning')
+      return
+    }
     setStockSubmitting(true)
     try {
       if (stockAction === 'reserve') {
         await prescriptionsApi.reserve(stockRx.id)
-        showToast('Prescripción reservada', `Prescripción ${stockRx.id} reservada.`, 'success')
+        showToast('Receta reservada', `Receta ${stockRx.id} reservada.`, 'success')
       } else if (stockAction === 'external') {
         await prescriptionsApi.externalPurchase(stockRx.id, { notes: externalNotes })
-        showToast('Compra externa registrada', `Prescripción ${stockRx.id}.`, 'success')
+        showToast('Compra externa registrada', `Receta ${stockRx.id}.`, 'success')
       } else {
         await prescriptionsApi.cancel(stockRx.id, { reason: cancelReason })
-        showToast('Prescripción anulada', `Prescripción ${stockRx.id} anulada.`, 'warning')
+        showToast('Receta anulada', `Receta ${stockRx.id} anulada.`, 'warning')
       }
       setStockRx(null)
       await load()
@@ -155,7 +176,7 @@ export default function PanelFarmacia() {
 
   return (
     <>
-      <PageHeader title="Panel Farmacia" subtitle="Gestión de prescripciones y stock de medicamentos">
+      <PageHeader title="Panel Farmacia" subtitle="Gestión de recetas y stock de medicamentos">
         <button className="btn btn-primary" onClick={() => navigate('/gestion-stock')}>
           ＋ Ingresar Stock
         </button>
@@ -172,7 +193,7 @@ export default function PanelFarmacia() {
               type="info"
               icon="📋"
               num={kpis.pendingPrescriptions ?? 0}
-              label="Prescripciones pendientes"
+              label="Recetas pendientes"
             />
             <Kpi
               type="warning"
@@ -240,9 +261,9 @@ export default function PanelFarmacia() {
           </div>
 
           <div className="card">
-            <h2 className="mt-0 mb-3">Cola de Prescripciones</h2>
+            <h2 className="mt-0 mb-3">Cola de Recetas</h2>
             {queue.length === 0 ? (
-              <Empty>No hay prescripciones en cola.</Empty>
+              <Empty>No hay recetas en cola.</Empty>
             ) : (
               <table className="table">
                 <thead>
@@ -273,6 +294,11 @@ export default function PanelFarmacia() {
                               Preparar
                             </button>
                           )}
+                          {acts.includes('markAvailable') && (
+                            <button className="btn btn-success btn-sm" disabled={busy} onClick={() => handleMarkAvailable(rx)}>
+                              Marcar disponible
+                            </button>
+                          )}
                         </td>
                       </tr>
                     )
@@ -289,7 +315,7 @@ export default function PanelFarmacia() {
         open={!!stockRx}
         onClose={() => setStockRx(null)}
         title="Sin stock"
-        subtitle={stockRx ? `No hay existencias para preparar la prescripción ${stockRx.id}.` : ''}
+        subtitle={stockRx ? `No hay existencias para preparar la receta ${stockRx.id}.` : ''}
         actions={
           <>
             <button className="btn btn-outline" onClick={() => setStockRx(null)} disabled={stockSubmitting}>
@@ -309,7 +335,7 @@ export default function PanelFarmacia() {
               checked={stockAction === 'reserve'}
               onChange={() => setStockAction('reserve')}
             />
-            <span>Reservar prescripción</span>
+            <span>Reservar receta</span>
           </label>
           <label className="radio-row">
             <input
@@ -327,7 +353,7 @@ export default function PanelFarmacia() {
               checked={stockAction === 'cancel'}
               onChange={() => setStockAction('cancel')}
             />
-            <span>Anular prescripción</span>
+            <span>Anular receta</span>
           </label>
         </div>
 
@@ -346,7 +372,7 @@ export default function PanelFarmacia() {
 
         {stockAction === 'cancel' && (
           <div className="input-group" style={{ marginTop: 12 }}>
-            <label htmlFor="cancelReason">Razón de anulación</label>
+            <label htmlFor="cancelReason">Motivo de anulación</label>
             <input
               id="cancelReason"
               className="input"

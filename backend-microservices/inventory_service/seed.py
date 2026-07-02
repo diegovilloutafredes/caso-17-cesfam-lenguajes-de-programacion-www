@@ -1,5 +1,3 @@
-"""Seed local de InventoryService: medicamentos, partidas y bajas (idempotente)."""
-
 from datetime import date
 
 from sqlalchemy import func, select
@@ -8,9 +6,7 @@ from sqlalchemy.orm import Session
 from inventory_service.db import SessionLocal
 from inventory_service.models import Batch, Medication, WriteOff
 
-# Invariante por medicamento: physicalQuantity = availableQuantity + reservedQuantity,
-# y physicalQuantity = Σ batch.availableQuantity. El reservedQuantity calza con los items de
-# recetas READY_FOR_PICKUP (las RESERVED no retienen stock: la reserva ocurre al pasar a READY).
+# physical = available + reserved; reserved debe calzar con las READY_FOR_PICKUP del seed de recetas
 _MEDICATIONS = [
     {
         "id": "MED-0001", "code": "MED-0001", "description": "Paracetamol 500mg",
@@ -213,8 +209,7 @@ _BATCHES = [
     },
 ]
 
-# Bajas que documentan las mermas de partidas (BCH-002 −20, BCH-004 −10): las cantidades de
-# arriba ya reflejan el estado posterior; estas filas dejan el registro de la baja.
+# las cantidades de las partidas ya descuentan estas bajas
 _WRITE_OFFS = [
     {
         "id": "WOF-001", "batchId": "BCH-002", "medicationId": "MED-0002",
@@ -231,7 +226,6 @@ _WRITE_OFFS = [
 ]
 
 def seed() -> None:
-    """Inserta el seed solo si las tablas están vacías (idempotente)."""
     db: Session = SessionLocal()
     try:
         if db.execute(select(func.count()).select_from(Medication)).scalar_one() == 0:

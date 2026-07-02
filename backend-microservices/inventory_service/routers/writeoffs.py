@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -35,8 +35,8 @@ def list_write_offs(
     status_filter: Optional[str] = None,
     dateFrom: Optional[date] = None,
     dateTo: Optional[date] = None,
-    page: int = 1,
-    limit: int = 20,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_session),
     _: dict = Depends(current_user),
 ):
@@ -53,7 +53,7 @@ def list_write_offs(
         stmt = stmt.where(WriteOff.expiredAt <= dateTo.isoformat())
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     rows = db.execute(
-        stmt.order_by(WriteOff.expiredAt.desc())
+        stmt.order_by(WriteOff.expiredAt.desc(), WriteOff.id.desc())
         .offset(max(0, (page - 1) * limit)).limit(limit)
     ).scalars().all()
     return ok({

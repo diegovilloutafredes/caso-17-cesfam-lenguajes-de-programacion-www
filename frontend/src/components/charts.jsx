@@ -9,7 +9,6 @@ import {
   Legend,
 } from 'chart.js'
 
-// Registro único de los elementos de Chart.js usados en la app.
 ChartJS.register(
   ArcElement,
   BarElement,
@@ -19,7 +18,7 @@ ChartJS.register(
   Legend,
 )
 
-// Paleta alineada a los tokens de diseño (Figma).
+// mismos colores que los tokens CSS
 export const CHART = {
   success: '#00913F',
   warning: '#897200',
@@ -38,7 +37,6 @@ export const baseOptions = {
 
 export { Doughnut, Bar }
 
-// Tarjeta contenedora con altura fija para los gráficos.
 export function ChartCard({ title, subtitle, children, actions }) {
   return (
     <div className="card">

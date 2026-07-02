@@ -1,5 +1,3 @@
-"""ReportService — generación de informes CSV. Agrega datos de Inventory y Prescription."""
-
 from fastapi import FastAPI
 
 from report_service.routers import analytics, reports

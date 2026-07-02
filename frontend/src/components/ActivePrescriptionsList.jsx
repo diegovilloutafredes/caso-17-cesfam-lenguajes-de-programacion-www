@@ -1,8 +1,6 @@
 import { Badge, Empty } from './ui'
 import { prescriptionStatus } from '../lib/format'
 
-// Lista de recetas activas reutilizable (modal de libreta / info de paciente).
-// El título y el texto secundario de cada fila se parametrizan por render-prop.
 export default function ActivePrescriptionsList({
   prescriptions,
   renderTitle = (rx) => rx.id,

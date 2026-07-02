@@ -1,6 +1,4 @@
-// Fuente única de verdad de las transiciones de estado de una receta, espejo de la
-// máquina de estados del backend (prescription_service). Cada pantalla muestra solo los
-// botones cuya acción está permitida en el estado actual; el backend igual valida.
+// debe calzar con las transiciones de prescription_service
 export function allowedActions(status) {
   switch (status) {
     case 'SUBMITTED':

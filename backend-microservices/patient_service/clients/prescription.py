@@ -4,12 +4,6 @@ from shared.http_client import ServiceClient
 
 
 class PrescriptionServiceClient(ServiceClient):
-    """Cliente HTTP de patient_service → prescription_service.
-
-    Usado por GET /patients/{id}/history para obtener prescripciones del paciente
-    (que viven en prescription_service, no en patient_service por bounded contexts).
-    """
-
     def __init__(self) -> None:
         super().__init__(
             base_url=os.getenv("PRESCRIPTION_SERVICE_URL", "http://localhost:8004"),

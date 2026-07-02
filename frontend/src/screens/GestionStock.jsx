@@ -6,9 +6,9 @@ import { useToast } from '../context/ToastContext'
 import { stockStatus, computeStockStatus } from '../lib/format'
 
 const REPORT_TYPES = [
-  { value: 'STOCK', label: 'STOCK' },
+  { value: 'STOCK', label: 'Stock' },
   { value: 'RESERVED', label: 'Reservados' },
-  { value: 'EXPIRED', label: 'Caducados' },
+  { value: 'EXPIRED', label: 'Vencidos' },
 ]
 
 const WRITE_OFF_REASONS = [
@@ -38,6 +38,7 @@ export default function GestionStock() {
   const [addForm, setAddForm] = useState({ medicationId: '', batchNumber: '', initialQuantity: '', expirationDate: '' })
   const [writeOffForm, setWriteOffForm] = useState({ reason: '', quantity: '', discard: false, notes: '' })
   const [reportForm, setReportForm] = useState({ reportType: 'STOCK', dateFrom: '', dateTo: '' })
+  const [saving, setSaving] = useState(false)
 
   const loadReqRef = useRef(0)
 
@@ -67,7 +68,6 @@ export default function GestionStock() {
     return () => clearTimeout(t)
   }, [load])
 
-  // Refresca todo lo dependiente tras una mutación; si el detalle está abierto, lo recarga.
   async function refresh(medId) {
     await load()
     if (medId) {
@@ -105,6 +105,7 @@ export default function GestionStock() {
       showToast('Faltan datos', 'Completa todos los campos.', 'warning')
       return
     }
+    setSaving(true)
     try {
       await inventoryApi.addBatch(addForm.medicationId, {
         batchNumber: addForm.batchNumber,
@@ -116,6 +117,8 @@ export default function GestionStock() {
       await load()
     } catch (err) {
       showToast('Error al ingresar stock', err.message, 'danger')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -124,6 +127,7 @@ export default function GestionStock() {
       showToast('Faltan datos', 'Indica motivo y cantidad.', 'warning')
       return
     }
+    setSaving(true)
     try {
       await inventoryApi.writeOff(writeOffBatch.id, {
         reason: writeOffForm.reason,
@@ -136,6 +140,8 @@ export default function GestionStock() {
       await refresh(detail?.id)
     } catch (err) {
       showToast('Error al dar de baja', err.message, 'danger')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -335,8 +341,10 @@ export default function GestionStock() {
         subtitle="Registrar una nueva partida de medicamentos."
         actions={
           <>
-            <button className="btn btn-outline" onClick={() => setAddOpen(false)}>Cancelar</button>
-            <button className="btn btn-primary" onClick={submitAdd}>Guardar partida</button>
+            <button className="btn btn-outline" onClick={() => setAddOpen(false)} disabled={saving}>Cancelar</button>
+            <button className="btn btn-primary" onClick={submitAdd} disabled={saving}>
+              {saving ? 'Guardando…' : 'Guardar partida'}
+            </button>
           </>
         }
       >
@@ -398,8 +406,10 @@ export default function GestionStock() {
         subtitle="Retira del stock las unidades dañadas o vencidas de la partida."
         actions={
           <>
-            <button className="btn btn-outline" onClick={() => setWriteOffBatch(null)}>Cancelar</button>
-            <button className="btn btn-danger" onClick={submitWriteOff}>Confirmar baja</button>
+            <button className="btn btn-outline" onClick={() => setWriteOffBatch(null)} disabled={saving}>Cancelar</button>
+            <button className="btn btn-danger" onClick={submitWriteOff} disabled={saving}>
+              {saving ? 'Registrando…' : 'Confirmar baja'}
+            </button>
           </>
         }
       >

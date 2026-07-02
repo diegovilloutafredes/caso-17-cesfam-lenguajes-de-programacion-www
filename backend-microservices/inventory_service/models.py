@@ -1,5 +1,3 @@
-"""Modelos SQLAlchemy 2.0 de InventoryService (tablas: medications, batches, write_offs)."""
-
 from datetime import date
 from typing import Optional
 
@@ -21,7 +19,7 @@ class Medication(Base):
     content: Mapped[str] = mapped_column(String)
     packaging: Mapped[str] = mapped_column(String)
     minStock: Mapped[int] = mapped_column(Integer)
-    # Stock embebido (3 columnas) -> invariante atómico
+    # invariante: physical = available + reserved
     availableQuantity: Mapped[int] = mapped_column(Integer, default=0)
     reservedQuantity: Mapped[int] = mapped_column(Integer, default=0)
     physicalQuantity: Mapped[int] = mapped_column(Integer, default=0)
@@ -36,7 +34,7 @@ class Batch(Base):
     arrivalDate: Mapped[date] = mapped_column(Date)
     expirationDate: Mapped[date] = mapped_column(Date)
     initialQuantity: Mapped[int] = mapped_column(Integer)
-    # ⚠️ rastrea el FÍSICO del lote (NO el available del stock del medicamento)
+    # ojo: es el físico del lote, no el available del medicamento
     availableQuantity: Mapped[int] = mapped_column(Integer)
 
 
@@ -46,10 +44,10 @@ class WriteOff(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)  # "WOF-001"
     batchId: Mapped[str] = mapped_column(ForeignKey("batches.id"))
     medicationId: Mapped[str] = mapped_column(String)  # copiado del batch
-    staffId: Mapped[str] = mapped_column(String)  # user['id'] del token, sin FK cruzada
+    staffId: Mapped[str] = mapped_column(String)
     reason: Mapped[str] = mapped_column(String)
     quantity: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String)
-    expiredAt: Mapped[str] = mapped_column(String)  # fecha de la baja (ISO string, mal nombrado)
+    expiredAt: Mapped[str] = mapped_column(String)  # fecha de la baja, pese al nombre
     discardDate: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
