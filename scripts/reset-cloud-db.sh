@@ -12,6 +12,11 @@ set -euo pipefail
 CYAN='\033[0;36m'; RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 PG_SERVICE="${RAILWAY_PG_SERVICE:-Postgres}"
 
+# el link de Railway vive en backend-microservices; desde otra ruta la CLI no resuelve el proyecto
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$ROOT_DIR/backend-microservices"
+
 command -v railway >/dev/null 2>&1 || { echo -e "${RED}Falta la CLI de Railway: npm i -g @railway/cli${NC}"; exit 1; }
 command -v docker  >/dev/null 2>&1 || { echo -e "${RED}Falta Docker (se usa para conectarse a Postgres).${NC}"; exit 1; }
 railway whoami >/dev/null 2>&1 || { echo -e "${RED}Inicia sesión primero: railway login${NC}"; exit 1; }
@@ -21,7 +26,8 @@ read -r -p "Escribe 'reset' para continuar: " ans
 [ "$ans" = "reset" ] || { echo "Cancelado."; exit 0; }
 
 echo -e "${CYAN}▶ Obteniendo la conexión pública de Postgres...${NC}"
-PUBURL="$(railway variables -s "$PG_SERVICE" --json | python3 -c 'import sys,json;print(json.load(sys.stdin).get("DATABASE_PUBLIC_URL",""))')"
+# la CLI puede anteponer avisos (p. ej. de actualización) al JSON; se recortan
+PUBURL="$(railway variables -s "$PG_SERVICE" --json | sed -n '/^{/,$p' | python3 -c 'import sys,json;print(json.load(sys.stdin).get("DATABASE_PUBLIC_URL",""))')"
 [ -n "$PUBURL" ] || { echo -e "${RED}No se obtuvo DATABASE_PUBLIC_URL del servicio '$PG_SERVICE'.${NC}"; exit 1; }
 
 PYTMP="$(mktemp)"; trap 'rm -f "$PYTMP"' EXIT
