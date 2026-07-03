@@ -92,21 +92,6 @@ def list_patients(
     })
 
 
-@router.get("/recent")
-def recent_patients(
-    limit: int = 5,
-    _: dict = Depends(current_user),
-    db: Session = Depends(get_session),
-):
-    items = db.execute(
-        select(Patient).order_by(Patient.id.desc()).limit(limit)
-    ).scalars().all()
-    return ok([
-        {"id": p.id, "rut": p.rut, "firstName": p.firstName, "lastName": p.lastName}
-        for p in items
-    ])
-
-
 @router.get("/{patient_id}")
 def get_patient(
     patient_id: str,

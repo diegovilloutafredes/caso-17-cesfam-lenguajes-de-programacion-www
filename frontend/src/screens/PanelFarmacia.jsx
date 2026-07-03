@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { dashboardsApi, patientsApi, prescriptionsApi } from '../api'
+import { dashboardsApi, notificationsApi, patientsApi, prescriptionsApi } from '../api'
 import Modal from '../components/Modal'
 import { Bar, Doughnut, ChartCard, CHART, baseOptions } from '../components/charts'
 import { Badge, Kpi, PageHeader, Empty } from '../components/ui'
 import { useToast } from '../context/ToastContext'
 import { prescriptionStatus, stockStatus, fullName } from '../lib/format'
 import { allowedActions } from '../lib/prescriptionActions'
+
+const EVENT_LABELS = {
+  RESERVATION_AVAILABLE: 'Disponible para retiro',
+  PICKUP_REMINDER: 'Recordatorio de retiro',
+}
 
 const TOP_WINDOWS = [
   { days: 30, label: 'Últimos 30 días' },
@@ -30,6 +35,11 @@ export default function PanelFarmacia() {
 
   // La cola solo trae patientId; los nombres salen de este catálogo.
   const [patientsById, setPatientsById] = useState({})
+
+  // modal Avisos enviados
+  const [avisosOpen, setAvisosOpen] = useState(false)
+  const [avisos, setAvisos] = useState([])
+  const [avisosLoading, setAvisosLoading] = useState(false)
 
   // modal Sin stock
   const [stockRx, setStockRx] = useState(null)
@@ -91,6 +101,19 @@ export default function PanelFarmacia() {
   function patientLabel(rx) {
     const p = patientsById[rx.patientId]
     return p ? fullName(p) : rx.patientId
+  }
+
+  async function openAvisos() {
+    setAvisosOpen(true)
+    setAvisosLoading(true)
+    try {
+      const res = await notificationsApi.list()
+      setAvisos(res || [])
+    } catch (err) {
+      showToast('Error al cargar los avisos', err.message, 'danger')
+    } finally {
+      setAvisosLoading(false)
+    }
   }
 
   async function handleMarkAvailable(rx) {
@@ -177,9 +200,12 @@ export default function PanelFarmacia() {
   return (
     <>
       <PageHeader title="Panel Farmacia" subtitle="Gestión de recetas y stock de medicamentos">
-        <button className="btn btn-primary" onClick={() => navigate('/gestion-stock')}>
-          ＋ Ingresar Stock
-        </button>
+        <div className="row">
+          <button className="btn btn-outline btn-sm" onClick={openAvisos}>Avisos enviados</button>
+          <button className="btn btn-primary" onClick={() => navigate('/gestion-stock')}>
+            ＋ Ingresar Stock
+          </button>
+        </div>
       </PageHeader>
 
       {loading ? (
@@ -309,6 +335,62 @@ export default function PanelFarmacia() {
           </div>
         </>
       )}
+
+      {/* Modal: avisos enviados a pacientes y apoderados */}
+      <Modal
+        open={avisosOpen}
+        onClose={() => setAvisosOpen(false)}
+        large
+        title="Avisos enviados"
+        subtitle="Correos y mensajes de texto emitidos a pacientes y apoderados."
+        actions={
+          <button className="btn btn-outline" onClick={() => setAvisosOpen(false)}>Cerrar</button>
+        }
+      >
+        {avisosLoading ? (
+          <Empty>Cargando avisos…</Empty>
+        ) : avisos.length === 0 ? (
+          <Empty>Sin avisos registrados.</Empty>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Evento</th>
+                <th>Canal</th>
+                <th>Destinatario</th>
+                <th>Receta</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {avisos.map((n) => {
+                const patient = patientsById[n.recipientPatientId]
+                const who = patient ? fullName(patient) : n.recipientPatientId || '—'
+                return (
+                  <tr key={n.id}>
+                    <td>{n.sentAt ? n.sentAt.slice(0, 16).replace('T', ' ') : '—'}</td>
+                    <td>{EVENT_LABELS[n.event] || n.event}</td>
+                    <td>{n.type === 'EMAIL' ? 'Correo' : 'SMS'}</td>
+                    <td>
+                      {who}
+                      {n.recipientGuardianId && <> <Badge type="muted">apoderado</Badge></>}
+                      <br />
+                      <small>{n.recipientAddress}</small>
+                    </td>
+                    <td>{n.prescriptionId || '—'}</td>
+                    <td>
+                      <Badge type={n.status === 'SENT' ? 'success' : n.status === 'ERROR' ? 'danger' : 'warning'}>
+                        {n.status === 'SENT' ? 'Enviado' : n.status === 'ERROR' ? 'Error' : 'Pendiente'}
+                      </Badge>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </Modal>
 
       {/* Modal: sin stock al preparar */}
       <Modal

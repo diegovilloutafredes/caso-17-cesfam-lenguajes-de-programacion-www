@@ -44,7 +44,6 @@ export const authApi = {
 
 export const patientsApi = {
   list: (params) => api.get('/api/v1/patients', { params }),
-  recent: (limit = 5) => api.get('/api/v1/patients/recent', { params: { limit } }),
   get: (id) => api.get(`/api/v1/patients/${id}`),
   update: (id, body) => api.put(`/api/v1/patients/${id}`, body),
   listGuardians: (id) => api.get(`/api/v1/patients/${id}/guardians`),
