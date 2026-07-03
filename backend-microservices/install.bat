@@ -7,7 +7,7 @@ cd /d "%~dp0"
 echo === Verificando Docker ===
 where docker >nul 2>nul
 if errorlevel 1 (
-    echo Docker no esta instalado. Instalalo desde https://www.docker.com/products/docker-desktop
+    echo Docker no esta instalado. Se descarga desde https://www.docker.com/products/docker-desktop
     exit /b 1
 )
 docker info >nul 2>nul

@@ -13,7 +13,7 @@ make dev      # build + arranca el backend (7 servicios + Postgres) y el fronten
 ```
 
 - App: <http://localhost:5173> · API/BFF: <http://localhost:8000>
-- Login: `drperez` (médico) / `mgonzalez` (farmacia) · detener: `Ctrl+C` o `make stop`
+- Login: `drperez / medico2026` (médico) · `mgonzalez / farmacia2026` (farmacia) · detener: `Ctrl+C` o `make stop`
 
 `make dev` instala las dependencias solo: las del backend dentro de la imagen Docker
 (`pip install`) y las del frontend (`npm install`).
@@ -93,7 +93,7 @@ backend-microservices/
 │   └── routers/{auth,dashboards,proxy}.py
 │
 ├── identity_service/               (:8001)
-│   ├── main.py · schemas.py · seed.py
+│   ├── main.py · schemas.py · seed.py · security.py
 │   └── routers/auth.py
 │
 ├── patient_service/                (:8002)
@@ -118,7 +118,7 @@ backend-microservices/
 └── report_service/                 (:8006)
     ├── main.py
     ├── clients/{inventory,prescription}.py
-    └── routers/reports.py
+    └── routers/{reports,analytics}.py
 ```
 
 > Cada servicio de dominio incluye además `db.py` (engine + `SessionLocal`) y `models.py`
@@ -154,7 +154,7 @@ backend-microservices/
 | **InventoryService**    | http://localhost:**8003** | http://localhost:8003/docs | Medicamentos, partidas, stock, bajas                         | Medicamentos, Partidas, Bajas           |
 | **PrescriptionService** | http://localhost:**8004** | http://localhost:8004/docs | Recetas + máquina de estados                                 | Recetas                                 |
 | **NotificationService** | http://localhost:**8005** | http://localhost:8005/docs | SMS / email (Twilio + SendGrid stubs)                        | Notificaciones                          |
-| **ReportService**       | http://localhost:**8006** | http://localhost:8006/docs | Informes CSV agregados                                       | Informes                                |
+| **ReportService**       | http://localhost:**8006** | http://localhost:8006/docs | Informes CSV y analítica agregada                            | Informes, Analítica                     |
 
 Cada servicio tiene además:
 - `GET /` - info básica del servicio
@@ -173,10 +173,11 @@ Cada servicio tiene además:
 | `GET /api/v1/patients/{id}/history` | PatientService | PrescriptionService |
 | `POST /api/v1/prescriptions` (crear) | PrescriptionService | PatientService (valida que el paciente exista) |
 | `POST /api/v1/prescriptions/{id}/prepare` | PrescriptionService | InventoryService (reserveStock por línea) |
-| `POST /api/v1/prescriptions/{id}/mark-available` | PrescriptionService | InventoryService (reserve) + NotificationService (best-effort SMS) |
+| `POST /api/v1/prescriptions/{id}/mark-available` | PrescriptionService | InventoryService (reserve) + PatientService (contacto) + NotificationService (correo y SMS, con fallback al apoderado) |
 | `POST /api/v1/prescriptions/{id}/cancel` | PrescriptionService | InventoryService (releaseStock si estaba reservado) |
-| `POST /api/v1/prescriptions/{id}/deliver` | PrescriptionService | InventoryService (consume por allocations de batches) |
-| `POST /api/v1/reports` (STOCK/RESERVED/EXPIRED) | ReportService | InventoryService + PrescriptionService |
+| `POST /api/v1/prescriptions/{id}/deliver` | PrescriptionService | PatientService (valida el apoderado) + InventoryService (consume validando partidas contra lo recetado) |
+| `GET /api/v1/prescriptions` y `/queue` | PrescriptionService | Al pasar: expira recetas vencidas (release en InventoryService) y emite recordatorios de retiro (NotificationService) |
+| `POST /api/v1/reports` (STOCK/RESERVED/EXPIRED) y `GET /api/v1/analytics/prescription-trend` | ReportService | InventoryService + PrescriptionService |
 | El resto (CRUDs simples) | — | Sin cross-service |
 
 **Toda llamada inter-servicio pasa por** `shared/http_client.py` → retry 3× con backoff exponencial + Circuit Breaker (abre tras 5 fallos, reset a los 30s).
@@ -326,6 +327,10 @@ Devuelve:
 | `dralopez`  | `medico2026`   | `sandbox-token-USR-003` | Dra. Ana López | **doctor**         | Médico alternativo                                       |
 | `mgonzalez` | `farmacia2026` | `sandbox-token-USR-002` | María González | **pharmacy_staff** | Flujos farmacia: preparar, entregar, write-offs, reports |
 
+Las mutaciones exigen el rol correspondiente: el **médico** emite recetas y el **personal
+de farmacia** prepara, entrega, gestiona stock, bajas y apoderados; con el rol equivocado la
+API responde 403. Anular recetas lo pueden hacer ambos.
+
 ### Cómo usar el token
 
 Una vez iniciada la sesión, el token va en el encabezado `Authorization`:
@@ -377,31 +382,32 @@ Cada servicio siembra su base al arrancar (PostgreSQL, una base por servicio). E
 ### Flujo recomendado para entender la arquitectura
 
 ```bash
-TOKEN="Bearer sandbox-token-USR-001"
+TOKEN_MEDICO="Bearer sandbox-token-USR-001"      # drperez: emite recetas
+TOKEN_FARMACIA="Bearer sandbox-token-USR-002"    # mgonzalez: prepara y entrega
 
 # 1) Login (passthrough gateway → identity)
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" -d '{"username":"drperez","password":"medico2026"}'
 
 # 2) Dashboard del médico (1 call → 3 servicios)
-curl http://localhost:8000/api/v1/doctor/dashboard -H "Authorization: $TOKEN"
+curl http://localhost:8000/api/v1/doctor/dashboard -H "Authorization: $TOKEN_MEDICO"
 
 # 3) Historial de un paciente (1 call → 2 servicios)
-curl http://localhost:8002/api/v1/patients/PAT-001/history -H "Authorization: $TOKEN"
+curl http://localhost:8002/api/v1/patients/PAT-001/history -H "Authorization: $TOKEN_MEDICO"
 
-# 4) Crear receta (valida paciente cross-service)
+# 4) Crear receta como médico (valida paciente cross-service; usar una fecha límite futura)
 curl -X POST http://localhost:8004/api/v1/prescriptions \
-  -H "Authorization: $TOKEN" -H "Content-Type: application/json" \
+  -H "Authorization: $TOKEN_MEDICO" -H "Content-Type: application/json" \
   -d '{"patientId":"PAT-002","treatmentType":"SHORT","durationDays":7,
-       "pickupDeadline":"2026-06-15",
+       "pickupDeadline":"2026-08-15",
        "items":[{"medicationId":"MED-0001","dosesPerInterval":1,"intervalHours":8,
                  "doseDescription":"1 c/8h","durationDays":7,"totalQuantity":10}]}'
 
-# 5) Preparar receta (reserva stock cross-service)
-curl -X POST http://localhost:8004/api/v1/prescriptions/R059/prepare -H "Authorization: $TOKEN"
+# 5) Preparar receta como farmacia (reserva stock cross-service; con rol de médico responde 403)
+curl -X POST http://localhost:8004/api/v1/prescriptions/R059/prepare -H "Authorization: $TOKEN_FARMACIA"
 
 # 6) Verificar stock cambió en otro servicio
-curl http://localhost:8003/api/v1/medications/MED-0001 -H "Authorization: $TOKEN"
+curl http://localhost:8003/api/v1/medications/MED-0001 -H "Authorization: $TOKEN_MEDICO"
 ```
 
 ### Verificación manual mínima
