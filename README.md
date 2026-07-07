@@ -1,6 +1,6 @@
 # Caso 17 — Automatización Libreta de Medicamentos CESFAM
 
-**INF-301 Lenguajes de Programación en WWW · Universidad Santa María (USM)**
+**INF-301 Lenguajes de Programación en WWW**
 
 ### Integrantes
 
