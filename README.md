@@ -1,4 +1,26 @@
-# Backend Microservicios - Caso 17 CESFAM
+# Caso 17 — Automatización Libreta de Medicamentos CESFAM
+
+**INF-301 Lenguajes de Programación en WWW · Universidad Santa María (USM)**
+
+### Integrantes
+
+- Benjamin Paulsen — 202173017-6
+- Gaspar Navarro — 202173003-6
+- Diego Villouta — 2773019-1
+- Badir Villegas — 202273020-K
+- Carolina Sire — 202173105-9
+- Bastian Camus — 202173013-3
+
+### Enlaces
+
+- **Video final:** <https://www.youtube.com/watch?v=nlrzXA4pico>
+- **Aplicación (desplegada):** <https://cesfam-frontend.vercel.app/login>
+- **Taiga:** <https://tree.taiga.io/project/incuboyd-cesfam/timeline> (acceso también por invitación al correo)
+- **Figma:** <https://www.figma.com/design/M4t15dslNRQUS57waoLyCF/Sin-t%C3%ADtulo?node-id=0-1&p=f&t=1nbznUF4WFuh8z8z-0>
+
+---
+
+## Backend de microservicios
 
 Backend del sistema de **Automatización de Libreta de Medicamentos CESFAM**, implementado como arquitectura de microservicios.
 
